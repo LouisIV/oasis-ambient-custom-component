@@ -1,8 +1,9 @@
 # Oasis Ambient — local Bluetooth Mesh
 
 Experimental Home Assistant custom integration. No lamp firmware changes or
-factory reset. Not yet published to a GitHub repository or the HACS catalog.
-The folder structure is suitable for a future HACS custom repository.
+factory reset. Source is maintained in the private GitHub repository
+[LouisIV/oasis-ambient-custom-component](https://github.com/LouisIV/oasis-ambient-custom-component).
+Not listed in the HACS catalog; manual installation is documented below.
 
 ## Verified against a real lamp
 
