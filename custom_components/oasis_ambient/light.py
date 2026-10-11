@@ -9,7 +9,8 @@ from .protocol import oasis_commands as commands
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    async_add_entities([OasisLight(entry, hass.data[DOMAIN][entry.entry_id])])
+    async_add_entities([OasisLight(entry, controller, data)
+                        for data, controller in hass.data[DOMAIN][entry.entry_id]])
 
 
 class OasisLight(LightEntity):
@@ -26,29 +27,30 @@ class OasisLight(LightEntity):
     _attr_color_temp_kelvin = None
     _attr_rgb_color = None
 
-    def __init__(self, entry, controller):
+    def __init__(self, entry, controller, data=None):
         self.entry = entry
+        self.data = data if data is not None else entry.data
         self.controller = controller
-        self._attr_unique_id = entry.unique_id
-        self._attr_device_info = {'identifiers': {(DOMAIN, entry.unique_id)},
-                                  'name': entry.data['lamp_name'], 'manufacturer': 'Oasis',
+        self._attr_unique_id = self.data.get('unique_id', entry.unique_id)
+        self._attr_device_info = {'identifiers': {(DOMAIN, self._attr_unique_id)},
+                                  'name': self.data['lamp_name'], 'manufacturer': 'Oasis',
                                   'model': 'Ambient (Bluetooth Mesh)'}
 
     @property
     def available(self):
-        return device_for(self.hass, self.entry.data['address']) is not None
+        return device_for(self.hass, self.data['address']) is not None
 
     async def async_added_to_hass(self):
         self.async_on_remove(bluetooth.async_register_callback(
             self.hass, lambda *_: self.async_write_ha_state(),
-            {'address': self.entry.data['address'], 'connectable': True},
+            {'address': self.data['address'], 'connectable': True},
             bluetooth.BluetoothScanningMode.ACTIVE))
         self.async_on_remove(bluetooth.async_track_unavailable(
             self.hass, lambda *_: self.async_write_ha_state(),
-            self.entry.data['address'], connectable=True))
+            self.data['address'], connectable=True))
 
     async def _send(self, messages):
-        device = device_for(self.hass, self.entry.data['address'])
+        device = device_for(self.hass, self.data['address'])
         if device is None:
             raise HomeAssistantError('Lamp is not reachable through Home Assistant Bluetooth')
         try:

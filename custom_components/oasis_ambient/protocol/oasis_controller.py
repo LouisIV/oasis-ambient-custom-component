@@ -17,8 +17,10 @@ PROXY_OUT = '00002ade-0000-1000-8000-00805f9b34fb'
 
 
 class OasisController:
-    def __init__(self, mesh, lamp_name, source, sequence_path, *, client_factory=BleakClient):
-        nodes = [n for n in mesh['nodes'] if n.get('name') == lamp_name]
+    def __init__(self, mesh, lamp_name, source, sequence_path, *, client_factory=BleakClient,
+                 destination=None, lock=None):
+        nodes = [n for n in mesh['nodes'] if (int(n['unicastAddress'], 16) == destination
+                 if destination is not None else n.get('name') == lamp_name)]
         if len(nodes) != 1:
             raise ValueError('Exactly one matching lamp is required')
         lamp = nodes[0]
@@ -48,7 +50,7 @@ class OasisController:
         self.source = source
         self.sequence_path = Path(sequence_path)
         self.client_factory = client_factory
-        self.lock = asyncio.Lock()
+        self.lock = lock if lock is not None else asyncio.Lock()
 
     def _allocate(self, iv_index, initialize):
         store = SequenceStore(self.sequence_path, self.identity, self.source, iv_index,
@@ -58,14 +60,14 @@ class OasisController:
         finally:
             store.close()
 
-    async def send(self, device, messages, *, initialize_sender=False):
+    async def send(self, device, messages, *, initialize_sender=False, authenticate_only=False):
         """Send an ordered batch. No automatic resend of partially sent commands.
 
         initialize_sender is only appropriate for a newly reserved sender.
         Production callers must not silently recreate missing sequence state.
         """
         messages = tuple(messages)
-        if (not messages and not initialize_sender) or any(not isinstance(m, bytes) or not 1 <= len(m) <= 11 for m in messages):
+        if (not messages and not (initialize_sender or authenticate_only)) or any(not isinstance(m, bytes) or not 1 <= len(m) <= 11 for m in messages):
             raise ValueError('Expected nonempty unsegmented access messages')
         async with self.lock:
             ready = asyncio.Event()
@@ -99,7 +101,7 @@ class OasisController:
                     if not messages:
                         # Setup authenticates the beacon and reserves a counter without
                         # changing the lamp. Only explicit setup may initialize state.
-                        await asyncio.to_thread(self._allocate, state['iv'], True)
+                        await asyncio.to_thread(self._allocate, state['iv'], initialize_sender)
                         return []
                     sequences = []
                     for access in messages:

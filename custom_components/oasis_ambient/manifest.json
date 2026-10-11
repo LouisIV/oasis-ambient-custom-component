@@ -1,11 +1,11 @@
 {
   "domain": "oasis_ambient",
   "name": "Oasis Ambient Local BLE",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "documentation": "https://github.com/LouisIV/oasis-ambient-custom-component",
   "issue_tracker": "https://github.com/LouisIV/oasis-ambient-custom-component/issues",
   "config_flow": true,
-  "dependencies": ["bluetooth", "bluetooth_adapters"],
+  "dependencies": ["bluetooth", "bluetooth_adapters", "file_upload"],
   "iot_class": "assumed_state",
   "requirements": [],
   "codeowners": []

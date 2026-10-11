@@ -3,23 +3,57 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect an existing Oasis mesh lamp",
-        "description": "Copy your private mesh export onto Home Assistant first. Use a NEW, unused mesh sender address for this installation (32766 is different from the Mac test sender 32767). Never reuse a sender after losing or restoring its sequence database. Setup only authenticates a beacon; it does not reset or change the lamp.",
-        "data": {
-          "mesh_file": "Absolute path to private mesh-export.json on Home Assistant",
-          "lamp_name": "Lamp name in the mesh export",
-          "address": "Bluetooth address shown by Home Assistant (not the Mac UUID)",
-          "source": "Unused mesh sender address (decimal)",
-          "new_sender_confirmed": "This sender is unused, or its original sequence database is intact"
-        }
+        "title": "Connect your Oasis lamps",
+        "description": "Keep your existing Oasis pairing. Import credentials once, then choose the lamps to control locally over Bluetooth.",
+        "menu_options": {"export": "Get credentials from Oasis", "upload": "Import a credential file"}
+      },
+      "export": {
+        "title": "Export your Oasis credentials",
+        "description": "On your Mac, Windows, or Linux computer, run the [guided exporter](https://github.com/LouisIV/oasis-ambient-custom-component#export-credentials-on-your-computer). Sign in on the official Oasis page; the exporter saves one file for all your lamp networks. It does not save your password or account tokens.\n\nKeep the exported file private. Select Submit when you have the file ready to upload."
+      },
+      "upload": {
+        "title": "Import credentials",
+        "description": "Choose the JSON file saved by the Oasis exporter. An existing mesh-export.json also works. Keys stay on your Home Assistant installation; daily control does not need the cloud.",
+        "data": {"credential_file": "Oasis credential file"}
+      },
+      "lamps": {
+        "title": "Choose your lamps",
+        "description": "Select one or more nearby lamps. Already configured lamps are hidden. Keep the lamps powered and disconnect any phone Bluetooth inspection app. Setup checks the connection without changing the lights.",
+        "data": {"lamps": "Lamps to add"}
+      },
+      "no_new_lamps": {
+        "title": "No additional lamps in this export",
+        "description": "Your supported lamps are already added, or this export has no supported lamps. If you paired more lamps in Oasis recently, export credentials again. Select Submit to import the updated file."
       }
     },
+    "progress": {"connect_lamps": "Checking your selected lamps over Bluetooth. This may take a minute for several lamps. No light settings or pairing will change."},
     "error": {
-      "confirm_sender": "Confirm the sender address is safe to use.",
-      "not_found": "Home Assistant cannot see a connectable Bluetooth device at this address.",
-      "invalid_mesh": "Check the export, lamp name, sender allocation, and sequence storage. No keys are logged.",
-      "cannot_connect": "Cannot connect or authenticate the lamp. Disconnect phone BLE tools and retry."
+      "invalid_export": "This file could not be imported, or existing mesh keys have changed. Export again from the same Oasis account. Do not reset the lamps.",
+      "no_lamps": "No supported Oasis mesh lamps were found. Pair your lamps in Oasis, then export again.",
+      "select_lamps": "Select at least one lamp from the list.",
+      "not_nearby": "A selected lamp is not uniquely visible nearby. Check power, Bluetooth range, and that lamp Bluetooth names are distinct, then submit again.",
+      "cannot_connect": "A lamp could not connect or authenticate. Close phone Bluetooth tools, move the adapter or proxy closer, and retry. No lamps were added.",
+      "unsafe_mesh": "The mesh configuration or saved controller state could not be used safely. Check the export and storage permissions. Do not delete sequence files to retry.",
+      "already_added": "Another setup added one of these lamps. Choose the remaining lamps."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {"title": "Add Oasis lamps", "menu_options": {"lamps": "Add lamps from saved credentials", "upload": "Import updated credentials", "export": "Get credentials from Oasis"}},
+      "export": {"title": "Export updated credentials", "description": "Run the [guided exporter](https://github.com/LouisIV/oasis-ambient-custom-component#export-credentials-on-your-computer) on your computer and sign in to Oasis. One export includes all lamp networks. Select Submit to upload the file."},
+      "upload": {"title": "Import updated credentials", "description": "Existing lamps and their controller counters are preserved. Importing credentials does not reset or re-pair lamps.", "data": {"credential_file": "Oasis credential file"}},
+      "lamps": {"title": "Add more lamps", "description": "Select the nearby lamps to add. Existing entities stay unchanged.", "data": {"lamps": "Lamps to add"}},
+      "no_new_lamps": {"title": "No additional lamps", "description": "If you paired more lamps in Oasis, run the exporter again. Select Submit to import an updated file."}
     },
-    "abort": {"already_configured": "This lamp is already configured."}
+    "progress": {"connect_lamps": "Checking the selected lamps over Bluetooth. Existing lamps remain configured."},
+    "error": {
+      "invalid_export": "The file could not be imported or existing mesh keys changed. Export again from the same account.",
+      "no_lamps": "No supported lamps found. Pair them in Oasis, then export again.",
+      "select_lamps": "Select at least one lamp.",
+      "not_nearby": "A selected lamp is not uniquely visible. Check power, Bluetooth range, and distinct lamp names, then retry.",
+      "cannot_connect": "Could not connect or authenticate. Disconnect phone Bluetooth tools and retry. No lamps were added.",
+      "unsafe_mesh": "Credentials or controller state could not be used safely. Do not delete sequence files; check the export and storage permissions.",
+      "already_added": "A selected lamp was added by another setup. Choose the remaining lamps."
+    }
   }
 }

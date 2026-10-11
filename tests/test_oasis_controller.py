@@ -1,4 +1,6 @@
 import tempfile
+import asyncio
+import copy
 import unittest
 from pathlib import Path
 
@@ -16,6 +18,7 @@ MESH = {'meshUUID': 'test-only', 'netKeys': [{'index': 0, 'key': KEY.hex()}],
 
 class FakeClient:
     sent = []
+    destinations = []
 
     def __init__(self, device, timeout):
         self.assembler = ProxyReassembler()
@@ -39,10 +42,37 @@ class FakeClient:
         result = self.assembler.feed(chunk)
         if result:
             msg = decrypt_network(KEY, 0, result[1])
+            self.destinations.append(msg.destination)
             self.sent.append((msg.sequence, decrypt_access(KEY, 0, msg)))
 
 
 class ControllerTest(unittest.IsolatedAsyncioTestCase):
+    async def test_two_destinations_use_shared_monotonic_counter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            mesh = copy.deepcopy(MESH)
+            second = copy.deepcopy(mesh['nodes'][0])
+            second['unicastAddress'] = '0003'
+            mesh['nodes'].append(second)
+            path = Path(directory) / 'seq.db'
+            lock = asyncio.Lock()
+            a = OasisController(mesh, 'test', 0x7ffe, path, destination=2,
+                                lock=lock, client_factory=FakeClient)
+            b = OasisController(mesh, 'test', 0x7ffe, path, destination=3,
+                                lock=lock, client_factory=FakeClient)
+            await a.send(None, [], initialize_sender=True)
+            FakeClient.sent, FakeClient.destinations = [], []
+            await asyncio.gather(a.send(None, [power(True)]), b.send(None, [power(False)]))
+            self.assertEqual([seq for seq, _ in FakeClient.sent], [1, 2])
+            self.assertEqual(FakeClient.destinations, [2, 3])
+            self.assertIs(a.lock, b.lock)
+
+    async def test_authenticate_only_does_not_recreate_lost_counter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            controller = OasisController(MESH, 'test', 0x7ffe, Path(directory) / 'missing.db',
+                                         client_factory=FakeClient)
+            with self.assertRaisesRegex(ValueError, 'state missing'):
+                await controller.send(None, [], authenticate_only=True)
+
     async def test_setup_does_not_send_lighting_commands(self):
         with tempfile.TemporaryDirectory() as directory:
             FakeClient.sent = []

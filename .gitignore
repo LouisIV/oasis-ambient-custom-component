@@ -14,3 +14,4 @@ node-groups.json
 tools-venv/
 analysis/
 .DS_Store
+oasis-credentials*.json
