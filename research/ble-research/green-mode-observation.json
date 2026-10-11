@@ -1,0 +1,18 @@
+[
+  {
+    "event": "authenticated_beacon",
+    "iv_index": 0
+  },
+  {
+    "event": "command_sent_not_confirmed",
+    "command": "color_mode_rgb",
+    "sequence": 6,
+    "access": "cce50201"
+  },
+  {
+    "event": "command_sent_not_confirmed",
+    "command": "rgb_green",
+    "sequence": 7,
+    "access": "c6e50200ff00"
+  }
+]

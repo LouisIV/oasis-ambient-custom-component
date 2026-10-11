@@ -1,0 +1,30 @@
+[
+  {
+    "event": "authenticated_beacon",
+    "iv_index": 0
+  },
+  {
+    "event": "command_sent_not_confirmed",
+    "command": "off",
+    "sequence": 1,
+    "access": "c3e50200"
+  },
+  {
+    "event": "command_sent_not_confirmed",
+    "command": "brightness_1_percent",
+    "sequence": 2,
+    "access": "c4e5020196bfcb6a"
+  },
+  {
+    "event": "command_sent_not_confirmed",
+    "command": "on",
+    "sequence": 3,
+    "access": "c3e50201"
+  },
+  {
+    "event": "command_sent_not_confirmed",
+    "command": "brightness_100_percent_6500_kelvin",
+    "sequence": 4,
+    "access": "d2e502641964ea73e42b"
+  }
+]

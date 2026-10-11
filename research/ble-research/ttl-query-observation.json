@@ -1,0 +1,22 @@
+[
+  {
+    "event": "authenticated_live_beacon",
+    "iv_index": 0
+  },
+  {
+    "event": "default_ttl_get_sent",
+    "source": "7fff",
+    "destination": "0002",
+    "sequence": 0
+  },
+  {
+    "event": "authenticated_config_response",
+    "source": "0002",
+    "sequence": 18,
+    "access": "800e07"
+  },
+  {
+    "event": "default_ttl",
+    "value": 7
+  }
+]

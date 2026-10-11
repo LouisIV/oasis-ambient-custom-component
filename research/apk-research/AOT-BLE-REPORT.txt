@@ -1,0 +1,210 @@
+Oasis 2.4.0 (222): concrete Dart AOT lighting commands
+2026-10-11. STATIC ONLY; no application execution or hardware access.
+
+RESULTS
+The following are decrypted Bluetooth Mesh ACCESS PDUs, NOT GATT payloads.
+Use the configured AppKey, vendor model 0x02E5C00A, and a valid mesh destination.
+Native code uses company 0x02E5, model 0xC00A, opcode=(messageId>>16)&0x3f.
+It emits [0xc0|opcode, 0xe5, 0x02] followed by these unchanged payload bytes.
+
+Command       messageId   Complete access PDU
+Off           0xC3E502    C3 E5 02 00
+On            0xC3E502    C3 E5 02 01
+Brightness    0xC4E502    C4 E5 02 || brightness_u8 || LE32(epoch_seconds)
+Temperature   0xC5E502    C5 E5 02 || LE16(kelvin)
+RGB color     0xC6E502    C6 E5 02 || red_u8 || green_u8 || blue_u8
+Color mode    0xCCE502    CC E5 02 01
+White mode    0xCCE502    CC E5 02 02
+Combined      0xD2E502    D2 E5 02 || LE16(kelvin) || brightness_u8
+                                    || LE32(epoch_milliseconds & 0xffffffff)
+
+No extra TID, transition time, or checksum is appended by these builders.
+The device wrapper supplies acknowledged=false. Native wrapper also defaults
+acknowledged=false. It encrypts/frames through Nordic mesh before proxy GATT.
+Brightness/temperature fields are masked to bytes, not scaled in these builders.
+The app's diagnostic combined caller generates brightness 0..100 and temperatures
+2700..6500; this is caller evidence, not proof of the firmware's accepted limits.
+Runtime acceptance/physical light response must be verified by the main agent.
+
+DISPATCH PROOF (not inferred from nearby strings)
+analysis/libapp.so SHA256:
+2b4b54f185649f72b2c459035db4622c891b93b0c03ff578c6261c14e3f761b3
+All code addresses below are ELF virtual addresses. Raw instruction bytes are in
+analysis/aot-evidence/<8-digit-function-start>.asm. Some small adjacent entries
+share a file; search the address in the directory if necessary.
+
+Device channel closure 0x851d68:
+  0x851dec..0x851e00: extract class ID; call dispatch x21[cid+0x1de4]
+  0x851e04..0x851e18: box returned integer (getter return is NOT a tagged Smi)
+  0x851e5c..0x851e70: extract class ID; call dispatch x21[cid+0x1c0d]
+  0x851ea0..0x851eb0: acknowledged=false
+  0x851ec8..0x851ecc: fnBleSendDeviceCommand via platform wrapper
+
+ARM64 dispatch register x21 points to table element4096, per Dart source.
+decode_dispatch.py decodes the serialized table at file offset0x19707a:
+  76,617 entries; first_code_id51429; consumes EXACTLY to snapshot end0x1a4251.
+  Code index is one-based; instruction-table base0x286a40, 29,748 entries.
+  The instruction table has first_entry_with_code22701; many lighting methods
+  are discarded-name entries, explaining why normal named-function export missed them.
+  analysis/dispatch-table.json records the decoded table.
+
+Class/cid       ID getter / code index        Payload getter / code index
+PNa /1160      0x6f9474 /17728               0x706960 /17983
+MNa /1163      0x6f9450 /17725               0x706444 /17980
+JNa /1166      0x6f9438 /17723               0x7061f4 /17977
+INa /1167      0x6f942c /17722               0x7060e0 /17976
+HNa /1168      0x6f9420 /17721               0x705f14 /17975
+GNa /1169      0x6f9414 /17720               0x705cac /17974
+
+Each ID getter is exactly MOV x0,#0xe502; MOVK x0,#high16,lsl16; RET.
+high16 is respectively C3, C5, CC, C6, C4, D2. The wrapper then boxes x0, proving
+these constants must NOT be divided by two as if they were tagged integers.
+
+PAYLOAD AND SEMANTICS EVIDENCE
+Power:
+  0x8cbcd0 room caller logs field isOn at0x8cbd34, carries the same boolean
+  through 0x8cbdec allocation and 0x8cbdf8 store to field+7.
+  Allocation0x8cb804 has tags0x48811c => cid1160/PNa.
+  0x8cbe0c calls room routing0x8525a4; its BLE branch calls0x852f30 at0x852bd8.
+  0x70697c loads boolean field+7; 0x706984 TST #0x10;0x706988 CSET EQ;
+  final array length1. True =>1, false=>0; caller's on/off branches independently
+  associate true with on (0x8cbec0..0x8cbed4).
+
+Brightness:
+  Allocation0x853874 => cid1168/HNa. Builder0x705f14 loads unboxed field+7.
+  0x705f30 calls clock0x836bd4; 0x705f54 loads1000;0x705f5c and0x705f60 SDIV
+  twice. For contemporary positive epoch time this gives whole seconds.
+  0x705fe4 onward masks brightness and shifts time by0/8/16/24.
+  0x706050..0x706084 stores five values; final copy length5 at0x7060b8.
+
+Temperature:
+  Allocation0x853868 has tags0x48b11c => cid1163/MNa.
+  Builder0x706444 loads field+7, masks low8 then arithmetic-shifts8 and masks.
+  Stores two values at0x7064a0/0x7064ac; final copy length2 at0x7064e0.
+  Real light update0x853534 uses the same temperature value for combined
+  field+0xf at0x85374c and standalone field+7 at0x853828.
+  Its fallback sends brightness at0x8537fc then temperature at0x853848.
+
+Combined:
+  Allocation0x853880 has tags0x49121c => cid1169/GNa.
+  0x853744 stores brightness+7;0x85374c temperature+0xf.
+  Builder0x705cac loads these fields and logs their separate labels.
+  Clock call0x705cc8; one divide1000 at0x705cf4; mask32 at0x705cfc.
+  0x705dd4..0x705df0 extracts temperature low/high bytes.
+  0x705df4..0x705dfc masks brightness.
+  0x705e08..0x705e2c extracts time bytes0,8,16,24.
+  Stores seven array entries0x705e54..0x705e9c; length7 at0x705ed0.
+
+CLOCK BINDING PROOF
+decode_dispatch.py additionally decodes the Function cluster at0xb7a1e.
+Function #410: refs[0x61e3,0x143e0,0x10594,0x18239], code index23048.
+Instruction table resolves23048 to0x836bd4. Fourth ref is native metadata:
+analysis/dart-aot/text/arrays.txt: 0x18239 List(2)
+  ["DateTime_currentTimeMicros", Null]. Thus shared input is microseconds.
+The difference in seconds vs milliseconds above is in actual instructions,
+not a guessed interpretation of the log's "ts" string.
+
+RGB FOLLOW-UP: CONCRETE ORDER AND PURE-RED PDU
+  Pure red: C6 E5 02 FF 00 00. No timestamp/TID/brightness byte.
+  Room color path0x8cb8b0 allocates INa at0x8cb910 via stub0x8cb990;
+  allocation tags0x48f11c prove cid1167. It stores the color object at+7
+  (0x8cb91c), then calls room routing0x8525a4 at0x8cb930.
+  Dispatch mapping resolves ID getter0x6f942c and payload getter0x7060e0.
+  ID getter MOV #0xe502 + MOVK #0xc6,lsl16 =>0xC6E502 unboxed.
+  Builder calls helpers in this order:
+    0x706108 ->0x2eed40 (red); 0x706114 ->0x2eec78 (green);
+    0x706120 ->0x2eebb0 (blue).
+  Saves results, stores array elements in that same order at0x706160,
+  0x70617c,0x706198; copies exactly3 bytes at0x7061cc/0x7061d8.
+  Independent executable mapping of helper semantics:
+    serializer0x2ee4d4 writes key red then calls0x2eed40 at0x2ee5dc,
+    key green then0x2eec78 at0x2ee638,
+    key blue then0x2eebb0 at0x2ee694, storing each result under that key.
+  Serializer0x7f2ca0 repeats the same mapping from object field+7.
+  Helpers dispatch normalized color channels, multiply by double255
+  (pool0x3e60 bits0x406fe00000000000), round through runtime helper,
+  and return integers. For pure endpoints0.0/1.0 this yields0/255 exactly.
+  This is a static command-format result, NOT proof that ambient_2_0 firmware
+  implements RGB or that color changes preserve previously set brightness.
+  No further hardware action was taken by this worker.
+
+EXAMPLE COMBINED VALUE DERIVATION
+  6500 decimal =0x1964 => LE16 bytes64 19.
+  100 decimal =0x64 => brightness byte64.
+  Therefore prefix D2 E5 02 64 19 64 is correct, followed by low32
+  epoch-milliseconds in little-endian order (total access length10).
+
+MODE FOLLOW-UP AFTER MAIN REPORTED GREEN DID NOT VISIBLY CHANGE THE LAMP
+  Evidence-backed color-mode command: CC E5 02 01.
+  Evidence-backed white/temperature-mode command: CC E5 02 02.
+  Green remains C6 E5 02 00 FF 00; its format is separate from mode switching.
+  Physical failure of C6 alone must be recorded; it is not proof of CCT-only
+  hardware. Nor does finding these commands prove firmware RGB support.
+  Mode-selector callback0x5b36b8 selects pool0x5a78 for temperature or
+  pool0x35a90 for color, then calls0x5b3718 ->0x5736fc ->0x8cac90.
+  0x8cacf0 allocates JNa via0x851fb0, tags0x48e11c =>cid1166.
+  Stores enum field+7 at0x8cacfc; sends via0x8525a4 at0x8cad10.
+  Dispatch resolves ID0x6f9438=>0xCCE502, payload0x7061f4.
+  Builder loads enum from command+7 then unboxed int64 at enum+0x13
+  (actual object offset0x14), returns exactly one byte.
+  Task-local dae diagnostic OASIS_ENUM_EVIDENCE dumps snapshot instances:
+    ref0x12402 (temperature): slots [unboxed1,unboxed0,name,unboxed2,unboxed0]
+    ref0x12403 (color):       slots [unboxed0,unboxed0,name,unboxed1,unboxed0]
+  Compressed slots are4 bytes starting at object offset8; slots3/4 form the
+  64-bit value at0x14: temperature2, color1. These are NOT enum ordinal values.
+  Independent white-mode call0x84f35c allocates JNa, loads temperature enum
+  at0x84f364, sends at0x84f37c, then logs "Sent white mode command".
+  RGB routine0x8cb8b0 only sends INa/C6, then sets its LOCAL cached mode to
+  color at0x8cb974. It does not also transmit JNa/CC or ON in this routine.
+  A mode switch followed by RGB is therefore an evidence-backed next test;
+  its success has not been observed by this static-only worker.
+
+STATE READBACK: NEGATIVE EVIDENCE / BOUNDARIES
+  No verified power/brightness/CCT/RGB query+status schema has been recovered.
+  Native vk/e registers vk/p as MeshStatusCallbacks (vk_e.txt offset0x1d4).
+  vk/p.onMeshMessageReceived explicitly handles composition, app-key, model
+  binding and subscription statuses, a missing-data transfer response, and
+  WiFi/provisioning response handling. Its terminal vendor fallback logs
+  "Unhandled message opCode" (offset0xbba..0xc30), without forwarding a
+  generic vendor state payload to Dart. onUnknownPduReceived also only logs.
+  The examined handlers do not decode lighting-state fields from vendor PDUs.
+  Thus transport/configuration response is NOT evidence of light-state readback.
+  App RGB/mode routines update local model fields after command dispatch; these
+  writes are not physical-state acknowledgements. UI state can be optimistic.
+  An empty-payload command class1171/ENa also shares messageId0xCCE502,
+  but its semantics are NOT established; do NOT label/send it as a state query
+  based on empty payload alone. Firmware may expose queries unused by this app.
+
+PROVISIONING DEPENDENCY
+analysis/native/vk_p.txt, static-OOB callback, offsets0x8c..0x108:
+  reads vk/j.f (nodeId); UTF-8 encodes it; allocates32 zero bytes;
+  copies min(nodeId byte length,32); converts to hex and calls
+  MeshManagerApi.setProvisioningAuthentication.
+If static OOB is requested but nodeId missing/empty, actual control flow fails
+with "Static OOB data requested but nodeId not available". An earlier log
+claims no-OOB fallback, but does not describe the executed error path.
+This establishes app preparation of OOB; final algorithm-dependent consumption
+inside Nordic provisioning has not been fully traced here.
+No reset/provisioning is required merely to use an already authenticated mesh.
+
+TOOLING / LIMITATIONS / REPRODUCIBILITY
+Flutter engine identifies Dart3.11.5. Isolated Rust dae0.1.13 matched the
+snapshot hash to its 3.11.6 profile, marked UNVERIFIED; zero parser warnings.
+Treat its generated pseudocode as exploratory only. Conclusions above are
+cross-checked with ARM64 bytes, class-allocation tags, decoded dispatch table,
+native metadata, and existing DEX trace. No APK/native library was executed.
+Tool source and cargo dependencies are under apk-research; no global installs.
+Run: tools-venv/bin/python decode_dispatch.py (from apk-research).
+
+Exact Dart3.11.5 serialization source is saved as dart-app_snapshot.cc:
+https://raw.githubusercontent.com/dart-lang/sdk/3.11.5/runtime/vm/app_snapshot.cc
+ReadDispatchTable lines9216ff; code-index mapping lines1800ff.
+ARM64 origin4096:
+https://raw.githubusercontent.com/dart-lang/sdk/3.11.5/runtime/vm/dispatch_table.h
+Native command/model, mesh credential import/export, and transport details:
+NATIVE-BLE-REPORT.md. Acquisition/publisher-auth caveats: REPORT.md.
+
+Cloud follow-up is owned by the main agent; no tokens were read and no account
+calls performed here. Static route evidence confirms /dev/v1/ and raw
+Authorization. Main reports success using scoped Cognito access_token and
+reports authenticating the physical lamp beacon with exported owner keys.

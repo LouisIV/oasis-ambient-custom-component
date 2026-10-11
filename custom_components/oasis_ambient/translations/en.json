@@ -1,0 +1,25 @@
+{
+  "title": "Oasis Ambient Local BLE",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect an existing Oasis mesh lamp",
+        "description": "Copy your private mesh export onto Home Assistant first. Use a NEW, unused mesh sender address for this installation (32766 is different from the Mac test sender 32767). Never reuse a sender after losing or restoring its sequence database. Setup only authenticates a beacon; it does not reset or change the lamp.",
+        "data": {
+          "mesh_file": "Absolute path to private mesh-export.json on Home Assistant",
+          "lamp_name": "Lamp name in the mesh export",
+          "address": "Bluetooth address shown by Home Assistant (not the Mac UUID)",
+          "source": "Unused mesh sender address (decimal)",
+          "new_sender_confirmed": "This sender is unused, or its original sequence database is intact"
+        }
+      }
+    },
+    "error": {
+      "confirm_sender": "Confirm the sender address is safe to use.",
+      "not_found": "Home Assistant cannot see a connectable Bluetooth device at this address.",
+      "invalid_mesh": "Check the export, lamp name, sender allocation, and sequence storage. No keys are logged.",
+      "cannot_connect": "Cannot connect or authenticate the lamp. Disconnect phone BLE tools and retry."
+    },
+    "abort": {"already_configured": "This lamp is already configured."}
+  }
+}

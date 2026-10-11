@@ -1,0 +1,12 @@
+[
+  {
+    "event": "authenticated_beacon",
+    "iv_index": 0
+  },
+  {
+    "event": "command_sent_not_confirmed",
+    "command": "rgb_green",
+    "sequence": 5,
+    "access": "c6e50200ff00"
+  }
+]

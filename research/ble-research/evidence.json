@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-11",
+  "lamp": {
+    "name": "OASIS_965bac",
+    "corebluetooth_uuid_this_mac_only": "B29DE0A4-2FA8-0879-CC51-BB91AFEF1055",
+    "model": "ambient_2_0",
+    "firmware": "2.32.1"
+  },
+  "verified": {
+    "mac_ble_discovery": true,
+    "gatt_connection": true,
+    "firmware_info_read": true,
+    "proxy_notify_subscription": true,
+    "mesh_beacon_received": true,
+    "lamp_state_change": true,
+    "lamp_state_change_evidence": "User confirmed: All your commands worked, after OFF, brightness 1% + ON, and brightness 100% at 6500 K test sequence.",
+    "mesh_credentials_obtained": true,
+    "beacon_authenticated": true,
+    "authenticated_config_ttl_readback": 7,
+    "lighting_state_readback": false,
+    "rgb_control": true,
+    "rgb_test_evidence": "RGB alone (C6E50200FF00, sequence5) produced no visible change. Then sent color mode CCE50201 sequence6, waited 300ms, sent green C6E50200FF00 sequence7. User confirmed: It worked! I got green color!"
+  },
+  "observed_mesh_beacon": {
+    "network_id": "3750844603aa1217",
+    "iv_index": 0,
+    "flags": 0,
+    "authentication": "e2d28700588e9301"
+  },
+  "custom_gatt_endpoints": {
+    "fedcba09-8765-4321-fedc-ba0987654321": {
+      "meaning": "WiFi scan",
+      "evidence": "APK native vk_d0 class, WifiScanner, b() writes scan byte"
+    },
+    "dcfecdab-9876-5431-dcfe-cdab98765431": {
+      "meaning": "firmware and model JSON",
+      "evidence": "live read and user screenshot"
+    },
+    "dcfedebc-0987-6541-dcfe-debc09876541": {
+      "meaning": "provisioning mode selection",
+      "evidence": "APK cl_n constants; cl_m.onServicesDiscovered writes 0101",
+      "caution": "Not a light control endpoint. No writes performed."
+    },
+    "dcfeefcd-1098-7651-dcfe-efcd10987651": {
+      "meaning": "unknown"
+    }
+  },
+  "other_findings": {
+    "esp_provisioning_service": "021a9004-0382-4aea-bff4-6b3f1c5adfb4",
+    "esp_provisioning_descriptors": "All six 2901 descriptors returned empty values in the current lamp state. Cause not established.",
+    "fnSendDataToLocal": "APK al_a -> zk_a.c uses WiFi/mDNS _esp_local_ctrl._tcp and Security1 PoP, not mesh BLE.",
+    "cloud_mesh_hint": "Owner-authorized account export via /dev/v1/user/node_group succeeded. Exported NetKey authenticated the live lamp beacon; keys remain in private local storage."
+  }
+}

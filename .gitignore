@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.db
+*.db-*
+private/
+mesh-export.json
+.venv/
+*.apk
+*.xapk
+*.dex
+*.so
+oauth-*.json
+node-groups.json
+tools-venv/
+analysis/
+.DS_Store

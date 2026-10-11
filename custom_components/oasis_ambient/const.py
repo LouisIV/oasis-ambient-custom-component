@@ -1,0 +1,1 @@
+DOMAIN = 'oasis_ambient'

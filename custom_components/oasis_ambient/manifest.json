@@ -1,0 +1,10 @@
+{
+  "domain": "oasis_ambient",
+  "name": "Oasis Ambient Local BLE",
+  "version": "0.2.0",
+  "config_flow": true,
+  "dependencies": ["bluetooth", "bluetooth_adapters"],
+  "iot_class": "assumed_state",
+  "requirements": [],
+  "codeowners": []
+}
