@@ -3,7 +3,7 @@ import asyncio
 import copy
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from pathlib import Path
 
 from mesh_crypto import beacon_key, cmac, k3, decrypt_network, decrypt_access
@@ -50,7 +50,7 @@ class FakeClient:
 
 class ControllerTest(unittest.IsolatedAsyncioTestCase):
     async def test_connector_disconnects_without_replaying_failed_batch(self):
-        client = SimpleNamespace(disconnect=AsyncMock())
+        client = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
         establish = AsyncMock(return_value=client)
         backend = SimpleNamespace(establish_connection=establish,
                                   BleakClientWithServiceCache=object)
@@ -60,17 +60,32 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
                 async with connected_client(device) as connected:
                     self.assertIs(connected, client)
                     raise ValueError('send failed')
-        establish.assert_awaited_once_with(object, device, 'test', max_attempts=3, timeout=20)
+        establish.assert_awaited_once_with(object, device, 'test', max_attempts=3, timeout=20,
+                                          use_services_cache=False)
         client.disconnect.assert_awaited_once()
 
     async def test_connector_disconnects_after_success(self):
-        client = SimpleNamespace(disconnect=AsyncMock())
+        client = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
         backend = SimpleNamespace(establish_connection=AsyncMock(return_value=client),
                                   BleakClientWithServiceCache=object)
         with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
             async with connected_client(SimpleNamespace(name=None, address='test-address')):
                 pass
         client.disconnect.assert_awaited_once()
+
+    async def test_missing_proxy_services_refresh_before_any_send(self):
+        stale = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(),
+                                services=Mock(get_characteristic=Mock(return_value=None)))
+        fresh = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
+        establish = AsyncMock(side_effect=[stale, fresh])
+        backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            async with connected_client(SimpleNamespace(name='test', address='test')) as client:
+                self.assertIs(client, fresh)
+        stale.clear_cache.assert_awaited_once()
+        stale.disconnect.assert_awaited_once()
+        fresh.disconnect.assert_awaited_once()
+        self.assertEqual(establish.await_count, 2)
 
     async def test_two_destinations_use_shared_monotonic_counter(self):
         with tempfile.TemporaryDirectory() as directory:

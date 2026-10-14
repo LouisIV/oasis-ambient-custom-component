@@ -6,6 +6,7 @@ an old sequence database or share one sender address across independent hosts.
 import asyncio
 import hashlib
 from contextlib import asynccontextmanager
+from bleak.exc import BleakError
 from pathlib import Path
 
 from .mesh_crypto import NetworkMessage, authenticate_beacon, encrypt_access, encrypt_network
@@ -21,14 +22,26 @@ async def connected_client(device, timeout=20):
     """Retry connection establishment only; never replay an access-message batch."""
     from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
 
-    client = await establish_connection(
-        BleakClientWithServiceCache, device, device.name or device.address,
-        max_attempts=3, timeout=timeout,
-    )
-    try:
-        yield client
-    finally:
-        await client.disconnect()
+    for attempt in range(2):
+        client = await establish_connection(
+            BleakClientWithServiceCache, device, device.name or device.address,
+            max_attempts=3, timeout=timeout, use_services_cache=False,
+        )
+        try:
+            missing = [uuid for uuid in (PROXY_IN, PROXY_OUT)
+                       if client.services.get_characteristic(uuid) is None]
+            if missing:
+                if attempt == 0:
+                    # No application data has been sent. Invalidate stale GATT
+                    # discovery once and reconnect, without touching mesh keys.
+                    await client.clear_cache()
+                    continue
+                raise BleakError('Mesh proxy characteristics missing after fresh discovery: '
+                                 + ', '.join(missing))
+            yield client
+            return
+        finally:
+            await client.disconnect()
 
 
 class OasisController:
