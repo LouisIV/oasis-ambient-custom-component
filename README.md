@@ -168,3 +168,13 @@ The APK receive path examined did not provide a verified lighting-state
 query/status schema. Authenticated configuration readback (TTL=7) works, but
 is not equivalent to power/brightness/color readback. State remains honestly
 marked optimistic until such a protocol is verified.
+
+### Home Assistant hardware validation status
+
+Version 0.3.1 has been loaded on Home Assistant 2026.10.1 on a Raspberry Pi.
+Credential import and authenticated mesh setup succeeded. Repeated control is
+**not yet validated**: runtime diagnostics showed the lamp absent from the
+Bluetooth backend's discovered devices, despite an older cached advertisement.
+The adapter was scanning with all five connection slots free. An active-scan
+test did not rediscover the lamp; the adapter's original automatic mode was
+restored. Treat this release as experimental pending repeated physical tests.
