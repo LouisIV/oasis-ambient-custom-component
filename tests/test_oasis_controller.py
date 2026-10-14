@@ -87,6 +87,20 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
         fresh.disconnect.assert_awaited_once()
         self.assertEqual(establish.await_count, 2)
 
+    async def test_missing_services_recovery_is_bounded(self):
+        from bleak.exc import BleakError
+        client = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(),
+                                 services=Mock(get_characteristic=Mock(return_value=None)))
+        establish = AsyncMock(return_value=client)
+        backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            with self.assertRaisesRegex(BleakError, 'missing after fresh discovery'):
+                async with connected_client(SimpleNamespace(name='test', address='test')):
+                    self.fail('Must not send through a non-proxy connection')
+        self.assertEqual(establish.await_count, 2)
+        self.assertEqual(client.disconnect.await_count, 2)
+        client.clear_cache.assert_awaited_once()
+
     async def test_two_destinations_use_shared_monotonic_counter(self):
         with tempfile.TemporaryDirectory() as directory:
             mesh = copy.deepcopy(MESH)

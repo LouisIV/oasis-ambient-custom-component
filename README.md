@@ -183,3 +183,13 @@ Bluetooth backend's discovered devices, despite an older cached advertisement.
 The adapter was scanning with all five connection slots free. An active-scan
 test did not rediscover the lamp; the adapter's original automatic mode was
 restored. Treat this release as experimental pending repeated physical tests.
+
+Further investigation: one owner-approved software reboot restored proxy
+advertisements without changing mesh address or keys. The next HA connection
+failed because its discovered GATT table lacked characteristic 2ADE; the lamp
+then became undiscoverable again. This does not establish the cause of the
+radio disappearance. Version 0.3.3 disables the optional service-cache shortcut,
+validates both proxy characteristics, and performs at most one cache refresh
+before sending any commands. That recovery has regression coverage but still
+needs live validation. The cloud `BLE Connected` flag remained true immediately
+after reboot and must not be treated as proof of an active GATT connection.
