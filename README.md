@@ -121,6 +121,12 @@ entries continue working and can use Configure to add more lamps.
   fresh sender address and reconfigure. Keep old sender addresses retired.
 - Do not copy a configured entry and counter database to a second live host.
 - A phone's BLE inspection app can occupy the lamp connection; disconnect it.
+- Connection establishment uses `bleak-retry-connector` supplied by Home
+  Assistant's Bluetooth dependency. Retries happen before sending a batch;
+  partially transmitted commands are never automatically replayed.
+- A successful HA service response alone is not proof of control: HA may skip
+  unavailable entities. Check the entity state and logs, and verify the physical
+  lamp. Connection failures now include the underlying exception in HA logs.
 
 ## Protocol
 

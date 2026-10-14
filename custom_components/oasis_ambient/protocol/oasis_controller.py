@@ -5,9 +5,9 @@ an old sequence database or share one sender address across independent hosts.
 """
 import asyncio
 import hashlib
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from bleak import BleakClient
 from .mesh_crypto import NetworkMessage, authenticate_beacon, encrypt_access, encrypt_network
 from .mesh_protocol import ProxyReassembler, SecureNetworkBeacon, fragment_proxy
 from .sequence_store import SequenceStore
@@ -16,8 +16,23 @@ PROXY_IN = '00002add-0000-1000-8000-00805f9b34fb'
 PROXY_OUT = '00002ade-0000-1000-8000-00805f9b34fb'
 
 
+@asynccontextmanager
+async def connected_client(device, timeout=20):
+    """Retry connection establishment only; never replay an access-message batch."""
+    from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
+
+    client = await establish_connection(
+        BleakClientWithServiceCache, device, device.name or device.address,
+        max_attempts=3, timeout=timeout,
+    )
+    try:
+        yield client
+    finally:
+        await client.disconnect()
+
+
 class OasisController:
-    def __init__(self, mesh, lamp_name, source, sequence_path, *, client_factory=BleakClient,
+    def __init__(self, mesh, lamp_name, source, sequence_path, *, client_factory=connected_client,
                  destination=None, lock=None):
         nodes = [n for n in mesh['nodes'] if (int(n['unicastAddress'], 16) == destination
                  if destination is not None else n.get('name') == lamp_name)]

@@ -1,4 +1,5 @@
 """Local RGB and white-light controls; state is optimistic, not polled."""
+import logging
 from bleak.exc import BleakError
 from homeassistant.components import bluetooth
 from homeassistant.components.light import LightEntity, ColorMode, ATTR_BRIGHTNESS, ATTR_COLOR_TEMP_KELVIN, ATTR_RGB_COLOR
@@ -6,6 +7,8 @@ from homeassistant.exceptions import HomeAssistantError
 from . import device_for
 from .const import DOMAIN
 from .protocol import oasis_commands as commands
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -56,6 +59,7 @@ class OasisLight(LightEntity):
         try:
             await self.controller.send(device, messages)
         except (BleakError, TimeoutError, OSError, ValueError) as error:
+            _LOGGER.exception('Oasis BLE operation failed for %s', self.data['address'])
             raise HomeAssistantError('Oasis BLE command failed; state not confirmed') from error
 
     async def async_turn_on(self, **kwargs):

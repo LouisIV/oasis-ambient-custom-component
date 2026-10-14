@@ -2,12 +2,14 @@ import tempfile
 import asyncio
 import copy
 import unittest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 from pathlib import Path
 
 from mesh_crypto import beacon_key, cmac, k3, decrypt_network, decrypt_access
 from mesh_protocol import fragment_proxy, ProxyReassembler
 from oasis_commands import power
-from oasis_controller import OasisController
+from oasis_controller import OasisController, connected_client
 
 KEY = bytes(range(16))
 MESH = {'meshUUID': 'test-only', 'netKeys': [{'index': 0, 'key': KEY.hex()}],
@@ -47,6 +49,29 @@ class FakeClient:
 
 
 class ControllerTest(unittest.IsolatedAsyncioTestCase):
+    async def test_connector_disconnects_without_replaying_failed_batch(self):
+        client = SimpleNamespace(disconnect=AsyncMock())
+        establish = AsyncMock(return_value=client)
+        backend = SimpleNamespace(establish_connection=establish,
+                                  BleakClientWithServiceCache=object)
+        device = SimpleNamespace(name='test', address='test-address')
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            with self.assertRaisesRegex(ValueError, 'send failed'):
+                async with connected_client(device) as connected:
+                    self.assertIs(connected, client)
+                    raise ValueError('send failed')
+        establish.assert_awaited_once_with(object, device, 'test', max_attempts=3, timeout=20)
+        client.disconnect.assert_awaited_once()
+
+    async def test_connector_disconnects_after_success(self):
+        client = SimpleNamespace(disconnect=AsyncMock())
+        backend = SimpleNamespace(establish_connection=AsyncMock(return_value=client),
+                                  BleakClientWithServiceCache=object)
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            async with connected_client(SimpleNamespace(name=None, address='test-address')):
+                pass
+        client.disconnect.assert_awaited_once()
+
     async def test_two_destinations_use_shared_monotonic_counter(self):
         with tempfile.TemporaryDirectory() as directory:
             mesh = copy.deepcopy(MESH)
