@@ -124,6 +124,11 @@ entries continue working and can use Configure to add more lamps.
 - Connection establishment uses `bleak-retry-connector` supplied by Home
   Assistant's Bluetooth dependency. Retries happen before sending a batch;
   partially transmitted commands are never automatically replayed.
+- Proxy discovery also matches the Mesh Network ID, so a missing advertised
+  name or changed proxy address does not require reimporting credentials.
+  A proxy on the same mesh may carry another lamp's addressed commands.
+  A live scanner backend and authenticated secure beacon are still required;
+  cached advertisement history alone is not treated as reachability.
 - A successful HA service response alone is not proof of control: HA may skip
   unavailable entities. Check the entity state and logs, and verify the physical
   lamp. Connection failures now include the underlying exception in HA logs.

@@ -41,19 +41,23 @@ class OasisLight(LightEntity):
 
     @property
     def available(self):
-        return device_for(self.hass, self.data['address']) is not None
+        return device_for(self.hass, self.data['address'], self.controller.net_key) is not None
 
     async def async_added_to_hass(self):
         self.async_on_remove(bluetooth.async_register_callback(
             self.hass, lambda *_: self.async_write_ha_state(),
             {'address': self.data['address'], 'connectable': True},
             bluetooth.BluetoothScanningMode.ACTIVE))
+        self.async_on_remove(bluetooth.async_register_callback(
+            self.hass, lambda *_: self.async_write_ha_state(),
+            {'service_uuid': '00001828-0000-1000-8000-00805f9b34fb', 'connectable': True},
+            bluetooth.BluetoothScanningMode.PASSIVE))
         self.async_on_remove(bluetooth.async_track_unavailable(
             self.hass, lambda *_: self.async_write_ha_state(),
             self.data['address'], connectable=True))
 
     async def _send(self, messages):
-        device = device_for(self.hass, self.data['address'])
+        device = device_for(self.hass, self.data['address'], self.controller.net_key)
         if device is None:
             raise HomeAssistantError('Lamp is not reachable through Home Assistant Bluetooth')
         try:

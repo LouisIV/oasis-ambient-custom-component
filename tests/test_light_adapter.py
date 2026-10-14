@@ -45,7 +45,7 @@ LIGHT = load_light()
 
 class LightAdapterTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.controller = types.SimpleNamespace(send=AsyncMock())
+        self.controller = types.SimpleNamespace(send=AsyncMock(), net_key=bytes(16))
         entry = types.SimpleNamespace(unique_id='test', data={'lamp_name': 'test', 'address': 'test'})
         self.entity = LIGHT.OasisLight(entry, self.controller)
         self.entity.hass = object()

@@ -7,6 +7,7 @@ from homeassistant.components import bluetooth
 from homeassistant.exceptions import ConfigEntryError
 from .const import DOMAIN
 from .protocol.oasis_controller import OasisController
+from .protocol.mesh_crypto import k3
 
 
 def load_controller(data, lock=None):
@@ -22,8 +23,29 @@ def lamp_data(entry):
     return [dict(entry.data, unique_id=entry.unique_id)]
 
 
-def device_for(hass, address):
-    return bluetooth.async_ble_device_from_address(hass, address, connectable=True)
+def device_for(hass, address, net_key=None):
+    """Resolve a current proxy, not just a cached name or historical MAC.
+
+    A proxy for the same mesh can transport commands for any destination in
+    that mesh. The controller still authenticates its secure beacon before
+    allocating a sequence or sending a command.
+    """
+    addresses = [address] if address else []
+    if net_key is not None:
+        network_id = b'\x00' + k3(net_key)
+        candidates = [info for info in bluetooth.async_discovered_service_info(hass, connectable=True)
+                      if getattr(info, 'service_data', {}).get(
+                          '00001828-0000-1000-8000-00805f9b34fb') == network_id]
+        candidates.sort(key=lambda info: getattr(info, 'rssi', -127), reverse=True)
+        addresses.extend(info.address for info in candidates if info.address not in addresses)
+    for candidate in addresses:
+        # History can retain a BLEDevice after BlueZ has removed it. Such a
+        # device makes the UI look available but cannot establish a connection.
+        if not bluetooth.async_scanner_devices_by_address(hass, candidate, connectable=True):
+            continue
+        if device := bluetooth.async_ble_device_from_address(hass, candidate, connectable=True):
+            return device
+    return None
 
 
 def network_lock(hass, identity):

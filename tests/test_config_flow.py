@@ -42,7 +42,9 @@ def load_flow():
     bluetooth = mods['homeassistant.components.bluetooth']
     bluetooth.async_discovered_service_info = lambda hass, **_: hass.nearby
     bluetooth.async_ble_device_from_address = lambda hass, address, **_: (
-        object() if any(info.address == address for info in hass.nearby) else None)
+        types.SimpleNamespace(address=address) if any(info.address == address for info in hass.nearby) else None)
+    bluetooth.async_scanner_devices_by_address = lambda hass, address, **_: (
+        [object()] if any(info.address == address for info in hass.nearby) else [])
     @contextmanager
     def upload(hass, path):
         yield Path(path)
@@ -93,6 +95,25 @@ async def simulated_auth(controller, device, messages, *, initialize_sender=Fals
 
 
 class ConfigFlowTests(unittest.IsolatedAsyncioTestCase):
+    def test_unnamed_proxy_is_resolved_by_network_id(self):
+        from protocol.mesh_crypto import k3
+        key = bytes.fromhex(self.mesh['netKeys'][0]['key'])
+        self.hass.nearby = [types.SimpleNamespace(name='random-address', address='new-address',
+            rssi=-40, service_data={'00001828-0000-1000-8000-00805f9b34fb': b'\x00' + k3(key)})]
+        self.assertEqual(self.flow._nearby('OASIS_test2', self.mesh), 'new-address')
+        self.assertEqual(PACKAGE.device_for(self.hass, 'old-address', key).address, 'new-address')
+
+    def test_unrelated_mesh_is_not_used_as_fallback(self):
+        from protocol.mesh_crypto import k3
+        key = bytes.fromhex(self.mesh['netKeys'][0]['key'])
+        self.hass.nearby = [types.SimpleNamespace(name='other', address='other-address',
+            service_data={'00001828-0000-1000-8000-00805f9b34fb': b'\x00' + k3(bytes([99])*16)})]
+        self.assertIsNone(PACKAGE.device_for(self.hass, 'old-address', key))
+
+    def test_cached_device_without_live_backend_is_not_available(self):
+        with patch.object(PACKAGE.bluetooth, 'async_scanner_devices_by_address', return_value=[]):
+            self.assertIsNone(PACKAGE.device_for(self.hass, 'address-2'))
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)

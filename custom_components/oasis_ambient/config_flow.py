@@ -73,10 +73,18 @@ class OnboardingSteps:
         return {item['unique_id'] for entry in self.hass.config_entries.async_entries(DOMAIN)
                 for item in lamp_data(entry) if item.get('unique_id')}
 
-    def _nearby(self, name):
+    def _nearby(self, name, mesh=None):
         matches = {info.address for info in bluetooth.async_discovered_service_info(self.hass, connectable=True)
                    if info.name == name}
-        return next(iter(matches)) if len(matches) == 1 else None
+        if len(matches) == 1:
+            address = next(iter(matches))
+            if device_for(self.hass, address) is not None:
+                return address
+        if mesh is not None:
+            key = bytes.fromhex(next(k['key'] for k in mesh['netKeys'] if k['index'] == 0))
+            if device := device_for(self.hass, None, key):
+                return device.address
+        return None
 
     async def async_step_lamps(self, user_input=None):
         errors = {'base': self._error} if self._error else {}
@@ -93,13 +101,13 @@ class OnboardingSteps:
             selected = list(dict.fromkeys(user_input.get('lamps', [])))
             if not selected or any(key not in choices for key in selected):
                 errors['base'] = 'select_lamps'
-            elif any(self._nearby(choices[key][1]['name']) is None for key in selected):
+            elif any(self._nearby(choices[key][1]['name'], choices[key][0]) is None for key in selected):
                 errors['base'] = 'not_nearby'
             else:
                 self._connect_task = self.hass.async_create_task(self._connect_selected(selected, choices))
                 return await self.async_step_connect()
-        options = [{'value': key, 'label': f"{node['name']} — {'nearby' if self._nearby(node['name']) else 'not found nearby'}"}
-                   for key, (_, node) in choices.items()]
+        options = [{'value': key, 'label': f"{node['name']} — {'mesh proxy nearby' if self._nearby(node['name'], mesh) else 'not found nearby'}"}
+                   for key, (mesh, node) in choices.items()]
         return self.async_show_form(step_id='lamps', errors=errors, data_schema=vol.Schema({
             vol.Required('lamps'): SelectSelector(SelectSelectorConfig(options=options, multiple=True)),
         }))
@@ -165,7 +173,7 @@ class OnboardingSteps:
                                            'mesh_file': str(meshfile), 'initialize': initialize,
                                            'saved': False}
             reservation = self._pending[identity]
-            address = self._nearby(node['name'])
+            address = self._nearby(node['name'], mesh)
             device = device_for(self.hass, address) if address else None
             if device is None:
                 raise ValueError('Device no longer reachable')
