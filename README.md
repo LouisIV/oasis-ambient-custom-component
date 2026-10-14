@@ -204,3 +204,13 @@ is again absent from the Bluetooth backend. Neither this timing fix nor cache
 recovery has been shown to restore reliable hardware control. A controlled
 Mac-first versus Pi-first connection comparison is still needed to isolate the
 failure; no factory reset or mesh reset has been performed.
+
+Version 0.3.5 removes the integration's automatic cache-clear/reconnect after
+incomplete GATT discovery. The upstream Linux cache-clear implementation can
+issue BlueZ `RemoveDevice`, so this is not simply an in-memory refresh. Instead,
+the integration logs service and characteristic UUIDs, fails before sending,
+and disconnects normally. This preserves the original failure rather than
+potentially replacing it with a missing-device error from the second attempt.
+It is a diagnostic safety correction, not a demonstrated fix for the lamp's
+disappearing advertisements. Connection-establishment retries remain managed
+by Home Assistant's retry connector; application batches are never replayed.

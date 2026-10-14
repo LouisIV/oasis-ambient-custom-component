@@ -73,19 +73,19 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
                 pass
         client.disconnect.assert_awaited_once()
 
-    async def test_missing_proxy_services_refresh_before_any_send(self):
+    async def test_missing_proxy_services_preserve_cache_and_do_not_send(self):
+        from bleak.exc import BleakError
         stale = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(),
                                 services=MagicMock(get_characteristic=Mock(return_value=None)))
-        fresh = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
-        establish = AsyncMock(side_effect=[stale, fresh])
+        establish = AsyncMock(return_value=stale)
         backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
         with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
-            async with connected_client(SimpleNamespace(name='test', address='test')) as client:
-                self.assertIs(client, fresh)
-        stale.clear_cache.assert_awaited_once()
+            with self.assertRaisesRegex(BleakError, 'missing after discovery'):
+                async with connected_client(SimpleNamespace(name='test', address='test')):
+                    self.fail('Must not send through a non-proxy connection')
+        stale.clear_cache.assert_not_awaited()
         stale.disconnect.assert_awaited_once()
-        fresh.disconnect.assert_awaited_once()
-        self.assertEqual(establish.await_count, 2)
+        self.assertEqual(establish.await_count, 1)
 
     async def test_missing_services_recovery_is_bounded(self):
         from bleak.exc import BleakError
@@ -94,12 +94,12 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
         establish = AsyncMock(return_value=client)
         backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
         with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
-            with self.assertRaisesRegex(BleakError, 'missing after fresh discovery'):
+            with self.assertRaisesRegex(BleakError, 'missing after discovery'):
                 async with connected_client(SimpleNamespace(name='test', address='test')):
                     self.fail('Must not send through a non-proxy connection')
-        self.assertEqual(establish.await_count, 2)
-        self.assertEqual(client.disconnect.await_count, 2)
-        client.clear_cache.assert_awaited_once()
+        self.assertEqual(establish.await_count, 1)
+        self.assertEqual(client.disconnect.await_count, 1)
+        client.clear_cache.assert_not_awaited()
 
     async def test_two_destinations_use_shared_monotonic_counter(self):
         with tempfile.TemporaryDirectory() as directory:
