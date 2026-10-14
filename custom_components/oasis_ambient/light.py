@@ -43,17 +43,22 @@ class OasisLight(LightEntity):
     def available(self):
         return device_for(self.hass, self.data['address'], self.controller.net_key) is not None
 
+    def _bluetooth_changed(self, *_):
+        # Scanner callbacks may run before the live backend device list is
+        # updated. Recompute availability on the next event-loop iteration.
+        self.async_schedule_update_ha_state()
+
     async def async_added_to_hass(self):
         self.async_on_remove(bluetooth.async_register_callback(
-            self.hass, lambda *_: self.async_write_ha_state(),
+            self.hass, self._bluetooth_changed,
             {'address': self.data['address'], 'connectable': True},
             bluetooth.BluetoothScanningMode.ACTIVE))
         self.async_on_remove(bluetooth.async_register_callback(
-            self.hass, lambda *_: self.async_write_ha_state(),
+            self.hass, self._bluetooth_changed,
             {'service_uuid': '00001828-0000-1000-8000-00805f9b34fb', 'connectable': True},
             bluetooth.BluetoothScanningMode.PASSIVE))
         self.async_on_remove(bluetooth.async_track_unavailable(
-            self.hass, lambda *_: self.async_write_ha_state(),
+            self.hass, self._bluetooth_changed,
             self.data['address'], connectable=True))
 
     async def _send(self, messages):

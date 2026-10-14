@@ -21,6 +21,8 @@ def load_light():
     class Entity:
         def async_write_ha_state(self):
             self.written = True
+        def async_schedule_update_ha_state(self):
+            self.scheduled = True
     light.LightEntity = Entity
     light.ColorMode = types.SimpleNamespace(COLOR_TEMP='color_temp', RGB='rgb')
     light.ATTR_BRIGHTNESS = 'brightness'
@@ -44,6 +46,11 @@ LIGHT = load_light()
 
 
 class LightAdapterTests(unittest.IsolatedAsyncioTestCase):
+    async def test_advertisement_defers_availability_evaluation(self):
+        self.entity._bluetooth_changed(object(), object())
+        self.assertTrue(self.entity.scheduled)
+        self.assertFalse(hasattr(self.entity, 'written'))
+
     def setUp(self):
         self.controller = types.SimpleNamespace(send=AsyncMock(), net_key=bytes(16))
         entry = types.SimpleNamespace(unique_id='test', data={'lamp_name': 'test', 'address': 'test'})

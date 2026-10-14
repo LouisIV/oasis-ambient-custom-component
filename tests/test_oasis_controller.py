@@ -3,7 +3,7 @@ import asyncio
 import copy
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, MagicMock, patch
 from pathlib import Path
 
 from mesh_crypto import beacon_key, cmac, k3, decrypt_network, decrypt_access
@@ -75,7 +75,7 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_missing_proxy_services_refresh_before_any_send(self):
         stale = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(),
-                                services=Mock(get_characteristic=Mock(return_value=None)))
+                                services=MagicMock(get_characteristic=Mock(return_value=None)))
         fresh = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
         establish = AsyncMock(side_effect=[stale, fresh])
         backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
@@ -90,7 +90,7 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
     async def test_missing_services_recovery_is_bounded(self):
         from bleak.exc import BleakError
         client = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(),
-                                 services=Mock(get_characteristic=Mock(return_value=None)))
+                                 services=MagicMock(get_characteristic=Mock(return_value=None)))
         establish = AsyncMock(return_value=client)
         backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
         with patch.dict('sys.modules', {'bleak_retry_connector': backend}):

@@ -5,6 +5,7 @@ an old sequence database or share one sender address across independent hosts.
 """
 import asyncio
 import hashlib
+import logging
 from contextlib import asynccontextmanager
 from bleak.exc import BleakError
 from pathlib import Path
@@ -15,6 +16,7 @@ from .sequence_store import SequenceStore
 
 PROXY_IN = '00002add-0000-1000-8000-00805f9b34fb'
 PROXY_OUT = '00002ade-0000-1000-8000-00805f9b34fb'
+_LOGGER = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -34,6 +36,9 @@ async def connected_client(device, timeout=20):
                 if attempt == 0:
                     # No application data has been sent. Invalidate stale GATT
                     # discovery once and reconnect, without touching mesh keys.
+                    _LOGGER.warning('Incomplete proxy GATT discovery for %s; refreshing cache once. '
+                                    'Services: %s', device.address,
+                                    [service.uuid for service in client.services])
                     await client.clear_cache()
                     continue
                 raise BleakError('Mesh proxy characteristics missing after fresh discovery: '
