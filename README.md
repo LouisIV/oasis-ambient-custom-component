@@ -14,8 +14,8 @@ Pure green was also physically verified after selecting color mode. Sending
 RGB alone while in white mode produced no visible change. The integration
 automatically selects color or white mode when the respective value is set.
 
-The transport was exercised from macOS. Home Assistant/Pi deployment has not
-been tested because the owner's Home Assistant instance is not running.
+The transport was physically verified from macOS. Home Assistant/Pi deployment
+is under investigation; repeated control there is not yet verified (see below).
 App-derived CCT range is 2700–6500 K; not every endpoint/value was physically
 tested. The standalone temperature command is decoded but not separately
 physically verified.
@@ -193,3 +193,14 @@ validates both proxy characteristics, and performs at most one cache refresh
 before sending any commands. That recovery has regression coverage but still
 needs live validation. The cloud `BLE Connected` flag remained true immediately
 after reboot and must not be treated as proof of an active GATT connection.
+
+A second approved software reboot increased Boot Count from 4 to 5 and briefly
+restored discovery. The subsequent HA test failed; `meshRxCount` remained zero.
+An availability callback timing issue was identified: entity state could be
+updated before the scanner backend's device list. Version 0.3.4 schedules that
+update on the next event-loop turn and logs service UUIDs on incomplete GATT
+discovery. It is confirmed running on HA with no startup errors, but the lamp
+is again absent from the Bluetooth backend. Neither this timing fix nor cache
+recovery has been shown to restore reliable hardware control. A controlled
+Mac-first versus Pi-first connection comparison is still needed to isolate the
+failure; no factory reset or mesh reset has been performed.
