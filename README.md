@@ -163,8 +163,12 @@ entries continue working and can use Configure to add more lamps.
 - Do not copy a configured entry and counter database to a second live host.
 - A phone's BLE inspection app can occupy the lamp connection; disconnect it.
 - Connection establishment uses `bleak-retry-connector` supplied by Home
-  Assistant's Bluetooth dependency. Retries happen before sending a batch;
-  partially transmitted commands are never automatically replayed.
+  Assistant's Bluetooth dependency. If a positively identified mesh proxy has
+  an incomplete GATT table, the integration performs one serialized,
+  rate-limited local cache recovery, waits for a fresh mesh advertisement, and
+  resolves the current proxy address again. Recovery is never attempted from
+  a saved address alone, and partially transmitted commands are never
+  automatically replayed.
 - Proxy discovery also matches the Mesh Network ID, so a missing advertised
   name or changed proxy address does not require reimporting credentials.
   A proxy on the same mesh may carry another lamp's addressed commands.

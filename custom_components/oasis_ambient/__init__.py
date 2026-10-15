@@ -26,7 +26,7 @@ def lamp_data(entry):
     return [dict(entry.data, unique_id=entry.unique_id)]
 
 
-def device_for(hass, address, net_key=None):
+def device_for(hass, address, net_key=None, *, network_only=False):
     """Resolve a current proxy, not just a cached name or historical MAC.
 
     A proxy for the same mesh can transport commands for any destination in
@@ -50,7 +50,7 @@ def device_for(hass, address, net_key=None):
         addresses.extend(info.address for info in candidates if info.address not in addresses)
     # A saved address is only a fallback hint. It may now belong to another
     # network; never prefer it over current network-matching advertisements.
-    if address and address not in addresses and address not in conflicting_addresses:
+    if not network_only and address and address not in addresses and address not in conflicting_addresses:
         addresses.append(address)
     for candidate in addresses:
         # History can retain a BLEDevice after BlueZ has removed it. Such a
@@ -60,6 +60,17 @@ def device_for(hass, address, net_key=None):
         if device := bluetooth.async_ble_device_from_address(hass, candidate, connectable=True):
             return device
     return None
+
+
+def network_proxy_for(hass, net_key):
+    """Resolve only a currently advertised proxy for this mesh."""
+    return device_for(hass, None, net_key, network_only=True)
+
+
+def proxy_recovery_state(hass, identity):
+    """Return serialized, rate-limited cache-recovery state for one mesh."""
+    states = hass.data.setdefault(DOMAIN, {}).setdefault('_proxy_recovery', {})
+    return states.setdefault(identity, {'lock': asyncio.Lock(), 'last_attempt': 0.0})
 
 
 def network_lock(hass, identity):
