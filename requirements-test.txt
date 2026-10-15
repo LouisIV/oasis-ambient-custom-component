@@ -1,0 +1,3 @@
+bleak>=0.22,<4
+cryptography>=42,<47
+voluptuous>=0.13,<1
