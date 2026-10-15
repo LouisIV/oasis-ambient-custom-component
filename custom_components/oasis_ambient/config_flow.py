@@ -298,6 +298,8 @@ class OasisConfigFlow(OnboardingSteps, config_entries.ConfigFlow, domain=DOMAIN)
         # does not contain enough information to identify an Oasis account or
         # a lamp, so never create an entry from Bluetooth alone.
         self._discovery_info = discovery_info
+        proxy_name = getattr(discovery_info, 'name', None) or 'Bluetooth Mesh Proxy'
+        self.context['title_placeholders'] = {'name': proxy_name}
         return await self.async_step_user()
 
     async def async_step_user(self, user_input=None):
