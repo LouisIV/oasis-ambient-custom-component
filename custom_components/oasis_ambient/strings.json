@@ -4,8 +4,11 @@
     "step": {
       "user": {
         "title": "Connect your Oasis lamps",
-        "description": "Keep your existing Oasis pairing. Import credentials once, then choose the lamps to control locally over Bluetooth.",
-        "menu_options": {"export": "Get credentials from Oasis", "upload": "Import a credential file"}
+        "description": "Sign in to Oasis, then choose the lamps to control from Home Assistant.",
+        "menu_options": {
+          "login": "Sign in to Oasis",
+          "advanced": "Advanced setup"
+        }
       },
       "export": {
         "title": "Export your Oasis credentials",
@@ -14,46 +17,121 @@
       "upload": {
         "title": "Import credentials",
         "description": "Choose the JSON file saved by the Oasis exporter. An existing mesh-export.json also works. Keys stay on your Home Assistant installation; daily control does not need the cloud.",
-        "data": {"credential_file": "Oasis credential file"}
+        "data": {
+          "credential_file": "Oasis credential file"
+        }
       },
       "lamps": {
         "title": "Choose your lamps",
-        "description": "Select one or more nearby lamps. Already configured lamps are hidden. Keep the lamps powered and disconnect any phone Bluetooth inspection app. Setup checks the connection without changing the lights.",
-        "data": {"lamps": "Lamps to add"}
+        "description": "Choose the lamps to add. Setup checks access to their Bluetooth mesh network without changing the lights. A nearby proxy does not confirm that every lamp is online.",
+        "data": {
+          "lamps": "Lamps to add"
+        }
       },
       "no_new_lamps": {
         "title": "No additional lamps in this export",
-        "description": "Your supported lamps are already added, or this export has no supported lamps. If you paired more lamps in Oasis recently, export credentials again. Select Submit to import the updated file."
+        "description": "No additional supported lamps were found in the loaded configuration. To check your Oasis account for newly paired lamps, close this dialog and choose Sign in to Oasis. Select Submit to import an updated file instead."
+      },
+      "login": {
+        "title": "Sign in to Oasis",
+        "description": "Use your Oasis email and password to find your lamps. Home Assistant sends them to Oasis to retrieve your lamp configuration; your password and account tokens are not saved. Daily lighting control stays local.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "advanced": {
+        "title": "Advanced setup",
+        "description": "Use a credential file if you already have one or cannot sign in here.",
+        "menu_options": {
+          "upload": "Import a credential file",
+          "export": "Get a credential file"
+        }
       }
     },
-    "progress": {"connect_lamps": "Checking your selected lamps over Bluetooth. This may take a minute for several lamps. No light settings or pairing will change."},
+    "progress": {
+      "connect_lamps": "Checking your selected lamps over Bluetooth. This may take a minute for several lamps. No light settings or pairing will change."
+    },
     "error": {
       "invalid_export": "This file could not be imported, or existing mesh keys have changed. Export again from the same Oasis account. Do not reset the lamps.",
-      "no_lamps": "No supported Oasis mesh lamps were found. Pair your lamps in Oasis, then export again.",
+      "no_lamps": "No supported lamps were found. Pair your lamps in the Oasis app, then try again.",
       "select_lamps": "Select at least one lamp from the list.",
-      "not_nearby": "A selected lamp is not uniquely visible nearby. Check power, Bluetooth range, and that lamp Bluetooth names are distinct, then submit again.",
+      "not_nearby": "No reachable Bluetooth proxy was found for a selected lamp’s network. Check lamp power and Bluetooth range, then try again.",
       "cannot_connect": "A lamp could not connect or authenticate. Close phone Bluetooth tools, move the adapter or proxy closer, and retry. No lamps were added.",
       "unsafe_mesh": "The mesh configuration or saved controller state could not be used safely. Check the export and storage permissions. Do not delete sequence files to retry.",
-      "already_added": "Another setup added one of these lamps. Choose the remaining lamps."
+      "already_added": "Another setup added one of these lamps. Choose the remaining lamps.",
+      "invalid_auth": "Oasis could not authorize this request. Check your email and password, then try again.",
+      "account_unavailable": "Could not reach Oasis. Check your internet connection and try again.",
+      "rate_limited": "Oasis is limiting sign-in attempts. Wait a few minutes before trying again.",
+      "invalid_account_data": "Oasis returned a lamp configuration we could not read. Try again or use Advanced setup to import a credential file.",
+      "additional_auth_required": "This account requires an additional sign-in step that is not supported here yet. Use Advanced setup and the browser-based exporter."
     }
   },
   "options": {
     "step": {
-      "init": {"title": "Add Oasis lamps", "menu_options": {"lamps": "Add lamps from saved credentials", "upload": "Import updated credentials", "export": "Get credentials from Oasis"}},
-      "export": {"title": "Export updated credentials", "description": "Run the [guided exporter](https://github.com/LouisIV/oasis-ambient-custom-component#export-credentials-on-your-computer) on your computer and sign in to Oasis. One export includes all lamp networks. Select Submit to upload the file."},
-      "upload": {"title": "Import updated credentials", "description": "Existing lamps and their controller counters are preserved. Importing credentials does not reset or re-pair lamps.", "data": {"credential_file": "Oasis credential file"}},
-      "lamps": {"title": "Add more lamps", "description": "Select the nearby lamps to add. Existing entities stay unchanged.", "data": {"lamps": "Lamps to add"}},
-      "no_new_lamps": {"title": "No additional lamps", "description": "If you paired more lamps in Oasis, run the exporter again. Select Submit to import an updated file."}
+      "init": {
+        "title": "Add Oasis lamps",
+        "menu_options": {
+          "lamps": "Add lamps from saved configuration",
+          "login": "Sign in to Oasis",
+          "advanced": "Advanced setup"
+        }
+      },
+      "export": {
+        "title": "Export updated credentials",
+        "description": "Run the [guided exporter](https://github.com/LouisIV/oasis-ambient-custom-component#export-credentials-on-your-computer) on your computer and sign in to Oasis. One export includes all lamp networks. Select Submit to upload the file."
+      },
+      "upload": {
+        "title": "Import updated credentials",
+        "description": "Existing lamps and their controller counters are preserved. Importing credentials does not reset or re-pair lamps.",
+        "data": {
+          "credential_file": "Oasis credential file"
+        }
+      },
+      "lamps": {
+        "title": "Add more lamps",
+        "description": "Choose the lamps to add. Setup checks access to their Bluetooth mesh network without changing the lights. A nearby proxy does not confirm that every lamp is online.",
+        "data": {
+          "lamps": "Lamps to add"
+        }
+      },
+      "no_new_lamps": {
+        "title": "No additional lamps",
+        "description": "No additional supported lamps were found in the loaded configuration. To check your Oasis account for newly paired lamps, close this dialog and choose Sign in to Oasis. Select Submit to import an updated file instead."
+      },
+      "login": {
+        "title": "Sign in to Oasis",
+        "description": "Use your Oasis email and password to find your lamps. Home Assistant sends them to Oasis to retrieve your lamp configuration; your password and account tokens are not saved. Daily lighting control stays local.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "advanced": {
+        "title": "Advanced setup",
+        "description": "Use a credential file if you already have one or cannot sign in here.",
+        "menu_options": {
+          "upload": "Import a credential file",
+          "export": "Get a credential file"
+        }
+      }
     },
-    "progress": {"connect_lamps": "Checking the selected lamps over Bluetooth. Existing lamps remain configured."},
+    "progress": {
+      "connect_lamps": "Checking the selected lamps over Bluetooth. Existing lamps remain configured."
+    },
     "error": {
       "invalid_export": "The file could not be imported or existing mesh keys changed. Export again from the same account.",
-      "no_lamps": "No supported lamps found. Pair them in Oasis, then export again.",
+      "no_lamps": "No supported lamps were found. Pair your lamps in the Oasis app, then try again.",
       "select_lamps": "Select at least one lamp.",
-      "not_nearby": "A selected lamp is not uniquely visible. Check power, Bluetooth range, and distinct lamp names, then retry.",
+      "not_nearby": "No reachable Bluetooth proxy was found for a selected lamp’s network. Check lamp power and Bluetooth range, then try again.",
       "cannot_connect": "Could not connect or authenticate. Disconnect phone Bluetooth tools and retry. No lamps were added.",
       "unsafe_mesh": "Credentials or controller state could not be used safely. Do not delete sequence files; check the export and storage permissions.",
-      "already_added": "A selected lamp was added by another setup. Choose the remaining lamps."
+      "already_added": "A selected lamp was added by another setup. Choose the remaining lamps.",
+      "invalid_auth": "Oasis could not authorize this request. Check your email and password, then try again.",
+      "account_unavailable": "Could not reach Oasis. Check your internet connection and try again.",
+      "rate_limited": "Oasis is limiting sign-in attempts. Wait a few minutes before trying again.",
+      "invalid_account_data": "Oasis returned a lamp configuration we could not read. Try again or use Advanced setup to import a credential file.",
+      "additional_auth_required": "This account requires an additional sign-in step that is not supported here yet. Use Advanced setup and the browser-based exporter."
     }
   }
 }

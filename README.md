@@ -27,18 +27,26 @@ physically verified.
 2. Enable Home Assistant's Bluetooth integration. A connectable local adapter
    or active ESPHome Bluetooth proxy must be within range. The integration
    uses Home Assistant's Bluetooth device lookup, not an independent scanner.
-3. [Export credentials on your computer](#export-credentials-on-your-computer).
-   Skip this if you already have an export from the earlier research tools.
-4. Add **Oasis Ambient Local BLE** in Devices & services. Choose **Import a
-   credential file** and upload the JSON. No SSH, file paths, Bluetooth
-   addresses, or raw keys are required in the setup form.
-5. Select one or more nearby lamps. Home Assistant discovers their Bluetooth
-   addresses, reserves a local controller address, and checks authenticated
-   BLE connectivity without changing any lights or pairing.
-6. Each lamp appears as its own light entity. Lamps in the same network share
+3. Add **Oasis Ambient Local BLE** in Devices & services. Choose **Sign in to
+   Oasis** and enter your Oasis email and password. Home Assistant retrieves
+   your mesh configuration directly from Oasis. The integration does not save
+   your password or account tokens.
+4. Select your lamps. Home Assistant discovers a nearby proxy for each mesh,
+   reserves a local controller address, and checks authenticated BLE connectivity
+   without changing any lights or pairing. Proxy access does not prove that
+   every selected destination lamp is online.
+5. Each lamp appears as its own light entity. Lamps in the same network share
    a serialized connection queue and durable sequence counter. Separate mesh
    networks get independent credentials and counters. Commands always address
    the selected lamp, never a broadcast group.
+
+Email/password login and mesh retrieval were verified on the owner’s account
+in Home Assistant 2026.10.1 with integration 0.3.6. The lamp selection form
+loaded OASIS_965bac successfully. BLE setup remains blocked by no reachable
+matching mesh proxy; successful lamp control through this flow is not yet verified. Accounts requiring additional login
+verification are not yet supported by this form. For those accounts or existing
+exports, use **Advanced setup** → **Import a credential file**, or the
+[desktop exporter](#export-credentials-on-your-computer).
 
 Private mesh exports are stored with 0600 permissions under
 `/config/.storage/oasis_ambient/`; sender reservation directories are 0700.
@@ -85,14 +93,16 @@ to be tested; the earlier manual OAuth/key export worked against the real accoun
 ## Add more lamps later
 
 Open the integration's **Configure** menu and choose **Add lamps from saved
-credentials**. Already configured lamps are hidden. Select additional nearby
+configuration**. Already configured lamps are hidden. Select additional nearby
 lamps and connect; existing entity IDs, sender addresses, and counters remain
-intact. If you recently paired new lamps in Oasis, choose **Import updated
-credentials** after rerunning the exporter. One file can contain several mesh
+intact. If you recently paired new lamps in Oasis, choose **Sign in to Oasis**
+to fetch the current configuration. Account tokens are not retained, so this
+requires signing in again. File imports remain available under **Advanced
+setup** after rerunning the exporter. One file can contain several mesh
 networks, and several lamps can be selected in one pass.
 
-If a selected lamp is offline, no entries from that selection are added. Bring
-it into range or select just the reachable lamps and retry. A failed or cancelled
+If no proxy for a selected mesh is reachable, no entries from that selection
+are added. Bring a proxy into range and retry. A failed or cancelled
 setup may retain private credential files and sender reservations; reservations
 are intentionally never recycled automatically. Existing v0.2 single-lamp
 entries continue working and can use Configure to add more lamps.
@@ -106,9 +116,15 @@ entries continue working and can use Configure to add more lamps.
   provisioning, or resets exposed.
 - Multiple exported mesh networks are supported, each using NetKey0 and
   AppKey0, vendor model 02E5C00A on the first element. Other layouts fail validation.
-- Discovery matches the exported lamp name to a unique nearby Bluetooth name.
-  Ambiguous or renamed advertisements are not guessed. Mesh authentication
-  then verifies the network keys; advertisement names alone are not trusted.
+- Discovery resolves current proxies by Mesh Network ID on every lookup,
+  preferring the strongest signal with a live scanner backend. Saved Bluetooth
+  addresses and unique lamp names are fallback hints; an address advertising
+  another network is excluded. Mesh authentication still verifies the network
+  keys before sending commands.
+- Bluetooth proxy addresses can change without changing HA entity IDs. Mesh
+  destination addresses are separate: they still come from imported credentials.
+  Reprovisioning or swapping mesh destination addresses is not automatically
+  reconciled. Discovery does not recover mesh keys or replace credential import.
 - Automatic sender reservation excludes exported allocations and locally
   reserved addresses. Unrelated third-party controllers absent from the export
   cannot be discovered; do not run cloned or independently provisioned controllers

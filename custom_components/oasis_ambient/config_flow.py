@@ -1,4 +1,4 @@
-"""Upload once, select several lamps, authenticate locally; never reset lamps."""
+"""Sign in once, select lamps, and authenticate locally; never reset lamps."""
 from pathlib import Path
 import secrets
 import voluptuous as vol
@@ -7,8 +7,9 @@ from homeassistant import config_entries
 from homeassistant.components import bluetooth
 from homeassistant.components.file_upload import process_uploaded_file
 from homeassistant.core import callback
-from homeassistant.helpers.selector import FileSelector, FileSelectorConfig, SelectSelector, SelectSelectorConfig
+from homeassistant.helpers.selector import FileSelector, FileSelectorConfig, SelectSelector, SelectSelectorConfig, TextSelector, TextSelectorConfig
 from . import device_for, lamp_data, network_lock
+from .cloud import AccountError, fetch_account_meshes
 from .const import DOMAIN
 from .onboarding import MAX_EXPORT_BYTES, lamp_choices, mesh_identity, parse_export, reserve_sender, save_mesh
 from .protocol.oasis_controller import OasisController
@@ -40,6 +41,42 @@ class OnboardingSteps:
             return await self.async_step_upload()
         return self.async_show_form(step_id='export', data_schema=vol.Schema({}))
 
+    def _merge_meshes(self, imported):
+        for mesh in imported:
+            key = mesh_identity(mesh)
+            for existing in self._meshes.values():
+                if existing['meshUUID'] == mesh['meshUUID'] and (
+                    mesh_identity(existing) != key or existing['appKeys'] != mesh['appKeys']
+                ):
+                    raise ValueError('Key migration is not supported')
+        for mesh in imported:
+            self._meshes[mesh_identity(mesh)] = mesh
+
+    async def async_step_login(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            try:
+                await self._load_saved()
+                imported = await self.hass.async_add_executor_job(
+                    fetch_account_meshes, user_input['email'], user_input['password'])
+                self._merge_meshes(imported)
+                if not lamp_choices(list(self._meshes.values())):
+                    errors['base'] = 'no_lamps'
+                else:
+                    return await self.async_step_lamps()
+            except AccountError as error:
+                errors['base'] = error.code
+            except (OSError, ValueError, KeyError, TypeError, StopIteration):
+                errors['base'] = 'invalid_export'
+        # Do not retain the submitted password, even as a form default.
+        return self.async_show_form(step_id='login', errors=errors, data_schema=vol.Schema({
+            vol.Required('email'): TextSelector(TextSelectorConfig(type='email')),
+            vol.Required('password'): TextSelector(TextSelectorConfig(type='password')),
+        }))
+
+    async def async_step_advanced(self, user_input=None):
+        return self.async_show_menu(step_id='advanced', menu_options=['upload', 'export'])
+
     async def async_step_upload(self, user_input=None):
         errors = {}
         if user_input is not None:
@@ -50,15 +87,7 @@ class OnboardingSteps:
                         with path.open('rb') as stream:
                             return parse_export(stream.read(MAX_EXPORT_BYTES + 1))
                 imported = await self.hass.async_add_executor_job(read_upload)
-                for mesh in imported:
-                    key = mesh_identity(mesh)
-                    for existing in self._meshes.values():
-                        if existing['meshUUID'] == mesh['meshUUID'] and (
-                            mesh_identity(existing) != key or existing['appKeys'] != mesh['appKeys']
-                        ):
-                            raise ValueError('Key migration is not supported')
-                for mesh in imported:
-                    self._meshes[mesh_identity(mesh)] = mesh
+                self._merge_meshes(imported)
                 if not lamp_choices(list(self._meshes.values())):
                     errors['base'] = 'no_lamps'
                 else:
@@ -74,15 +103,16 @@ class OnboardingSteps:
                 for item in lamp_data(entry) if item.get('unique_id')}
 
     def _nearby(self, name, mesh=None):
+        key = None
+        if mesh is not None:
+            key = bytes.fromhex(next(k['key'] for k in mesh['netKeys'] if k['index'] == 0))
+            if device := device_for(self.hass, None, key):
+                return device.address
         matches = {info.address for info in bluetooth.async_discovered_service_info(self.hass, connectable=True)
                    if info.name == name}
         if len(matches) == 1:
             address = next(iter(matches))
-            if device_for(self.hass, address) is not None:
-                return address
-        if mesh is not None:
-            key = bytes.fromhex(next(k['key'] for k in mesh['netKeys'] if k['index'] == 0))
-            if device := device_for(self.hass, None, key):
+            if device := device_for(self.hass, address, key):
                 return device.address
         return None
 
@@ -200,7 +230,7 @@ class OasisConfigFlow(OnboardingSteps, config_entries.ConfigFlow, domain=DOMAIN)
         self._start()
 
     async def async_step_user(self, user_input=None):
-        return self.async_show_menu(step_id='user', menu_options=['export', 'upload'])
+        return self.async_show_menu(step_id='user', menu_options=['login', 'advanced'])
 
     @staticmethod
     @callback
@@ -213,4 +243,4 @@ class OasisOptionsFlow(OnboardingSteps, config_entries.OptionsFlow):
         self._start(entry)
 
     async def async_step_init(self, user_input=None):
-        return self.async_show_menu(step_id='init', menu_options=['lamps', 'upload', 'export'])
+        return self.async_show_menu(step_id='init', menu_options=['lamps', 'login', 'advanced'])

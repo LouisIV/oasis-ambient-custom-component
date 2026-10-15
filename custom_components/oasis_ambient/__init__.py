@@ -30,14 +30,25 @@ def device_for(hass, address, net_key=None):
     that mesh. The controller still authenticates its secure beacon before
     allocating a sequence or sending a command.
     """
-    addresses = [address] if address else []
+    addresses = []
+    conflicting_addresses = set()
     if net_key is not None:
         network_id = b'\x00' + k3(net_key)
-        candidates = [info for info in bluetooth.async_discovered_service_info(hass, connectable=True)
+        discovered = bluetooth.async_discovered_service_info(hass, connectable=True)
+        candidates = [info for info in discovered
                       if getattr(info, 'service_data', {}).get(
                           '00001828-0000-1000-8000-00805f9b34fb') == network_id]
+        for info in discovered:
+            advertised = getattr(info, 'service_data', {}).get(
+                '00001828-0000-1000-8000-00805f9b34fb', b'')
+            if len(advertised) == 9 and advertised[0] == 0 and advertised != network_id:
+                conflicting_addresses.add(info.address)
         candidates.sort(key=lambda info: getattr(info, 'rssi', -127), reverse=True)
         addresses.extend(info.address for info in candidates if info.address not in addresses)
+    # A saved address is only a fallback hint. It may now belong to another
+    # network; never prefer it over current network-matching advertisements.
+    if address and address not in addresses and address not in conflicting_addresses:
+        addresses.append(address)
     for candidate in addresses:
         # History can retain a BLEDevice after BlueZ has removed it. Such a
         # device makes the UI look available but cannot establish a connection.

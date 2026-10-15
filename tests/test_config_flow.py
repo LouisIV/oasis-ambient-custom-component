@@ -55,8 +55,8 @@ def load_flow():
         def __call__(self, value):
             return value
     selectors = mods['homeassistant.helpers.selector']
-    selectors.FileSelector = selectors.SelectSelector = Selector
-    selectors.FileSelectorConfig = selectors.SelectSelectorConfig = dict
+    selectors.FileSelector = selectors.SelectSelector = selectors.TextSelector = Selector
+    selectors.FileSelectorConfig = selectors.SelectSelectorConfig = selectors.TextSelectorConfig = dict
     with patch.dict(sys.modules, mods):
         spec = importlib.util.spec_from_file_location('oasis_flow_test', ROOT / '__init__.py',
                                                      submodule_search_locations=[str(ROOT)])
@@ -95,6 +95,62 @@ async def simulated_auth(controller, device, messages, *, initialize_sender=Fals
 
 
 class ConfigFlowTests(unittest.IsolatedAsyncioTestCase):
+    async def test_account_login_reaches_lamps_without_retaining_login(self):
+        with patch.object(FLOW, 'fetch_account_meshes', return_value=[self.mesh]) as fetch:
+            result = await self.flow.async_step_login({'email': 'test@example.com', 'password': 'secret-password'})
+        self.assertEqual(result['step_id'], 'lamps')
+        fetch.assert_called_once_with('test@example.com', 'secret-password')
+        self.assertNotIn('secret-password', repr(vars(self.flow)))
+
+    async def test_failed_login_can_retry_without_password_default(self):
+        with patch.object(FLOW, 'fetch_account_meshes', side_effect=FLOW.AccountError('invalid_auth')):
+            result = await self.flow.async_step_login({'email': 'test@example.com', 'password': 'secret-password'})
+        self.assertEqual(result['step_id'], 'login')
+        self.assertEqual(result['errors'], {'base': 'invalid_auth'})
+        self.assertNotIn('secret-password', repr(result))
+        self.assertNotIn('secret-password', repr(vars(self.flow)))
+
+    async def test_login_does_not_accept_changed_network_keys(self):
+        changed = fixture_mesh()
+        changed['netKeys'][0]['key'] = '09' * 16
+        with patch.object(FLOW, 'fetch_account_meshes', return_value=[changed]):
+            result = await self.flow.async_step_login({'email': 'test', 'password': 'test'})
+        self.assertEqual(result['errors'], {'base': 'invalid_export'})
+        self.assertEqual(list(self.flow._meshes.values()), [self.mesh])
+
+    async def test_setup_prioritizes_login_and_preserves_advanced_import(self):
+        self.assertEqual((await self.flow.async_step_user())['menu_options'], ['login', 'advanced'])
+        self.assertEqual((await self.flow.async_step_advanced())['menu_options'], ['upload', 'export'])
+
+    def proxy(self, address, key, rssi=-40, name='renamed'):
+        from protocol.mesh_crypto import k3
+        return types.SimpleNamespace(name=name, address=address, rssi=rssi,
+            service_data={'00001828-0000-1000-8000-00805f9b34fb': b'\x00' + k3(key)})
+
+    def test_current_network_wins_over_saved_address_and_name(self):
+        key = bytes.fromhex(self.mesh['netKeys'][0]['key'])
+        self.hass.nearby = [self.proxy('old', bytes([99]) * 16, name='OASIS_test2'),
+                            self.proxy('new', key)]
+        self.assertEqual(PACKAGE.device_for(self.hass, 'old', key).address, 'new')
+        self.assertEqual(self.flow._nearby('OASIS_test2', self.mesh), 'new')
+        self.hass.nearby.pop()
+        self.assertIsNone(PACKAGE.device_for(self.hass, 'old', key))
+        self.assertIsNone(self.flow._nearby('OASIS_test2', self.mesh))
+
+    def test_proxy_selection_follows_current_signal_and_address(self):
+        key = bytes.fromhex(self.mesh['netKeys'][0]['key'])
+        self.hass.nearby = [self.proxy('old', key, -80), self.proxy('new', key, -30)]
+        self.assertEqual(PACKAGE.device_for(self.hass, 'old', key).address, 'new')
+        self.hass.nearby = [self.proxy('rotated', key)]
+        self.assertEqual(PACKAGE.device_for(self.hass, 'old', key).address, 'rotated')
+
+    def test_stale_strong_proxy_does_not_hide_live_proxy(self):
+        key = bytes.fromhex(self.mesh['netKeys'][0]['key'])
+        self.hass.nearby = [self.proxy('stale', key, -20), self.proxy('live', key, -80)]
+        with patch.object(PACKAGE.bluetooth, 'async_scanner_devices_by_address',
+                          side_effect=lambda hass, address, **_: [] if address == 'stale' else [object()]):
+            self.assertEqual(PACKAGE.device_for(self.hass, None, key).address, 'live')
+
     def test_unnamed_proxy_is_resolved_by_network_id(self):
         from protocol.mesh_crypto import k3
         key = bytes.fromhex(self.mesh['netKeys'][0]['key'])
