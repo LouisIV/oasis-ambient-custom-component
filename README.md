@@ -3,7 +3,8 @@
 Experimental Home Assistant custom integration. No lamp firmware changes or
 factory reset. Source is maintained in the private GitHub repository
 [LouisIV/oasis-ambient-custom-component](https://github.com/LouisIV/oasis-ambient-custom-component).
-Not listed in the HACS catalog; manual installation is documented below.
+Not listed in the HACS catalog; add it as a custom repository using the
+installation button below.
 
 ## Verified against a real lamp
 
@@ -22,20 +23,37 @@ physically verified.
 
 ## Installation and setup
 
-1. Copy `custom_components/oasis_ambient` into Home Assistant's
-   `/config/custom_components/`, then restart Home Assistant.
-2. Enable Home Assistant's Bluetooth integration. A connectable local adapter
+The integration can be installed through HACS or manually.
+
+### With HACS
+
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+
+Add this repository as a [custom repository](https://hacs.xyz/docs/faq/custom_repositories/)
+with category **Integration**, then install it and restart Home Assistant. You
+can also open it directly in Home Assistant:
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=LouisIV&repository=oasis-ambient-custom-component&category=integration)
+
+### Manual installation
+
+Copy `custom_components/oasis_ambient` into Home Assistant's
+`/config/custom_components/`, then restart Home Assistant.
+
+### Setup
+
+1. Enable Home Assistant's Bluetooth integration. A connectable local adapter
    or active ESPHome Bluetooth proxy must be within range. The integration
    uses Home Assistant's Bluetooth device lookup, not an independent scanner.
-3. Add **Oasis Ambient Local BLE** in Devices & services. Choose **Sign in to
+2. Add **Oasis Ambient Local BLE** in Devices & services. Choose **Sign in to
    Oasis** and enter your Oasis email and password. Home Assistant retrieves
    your mesh configuration directly from Oasis. The integration does not save
    your password or account tokens.
-4. Select your lamps. Home Assistant discovers a nearby proxy for each mesh,
+3. Select your lamps. Home Assistant discovers a nearby proxy for each mesh,
    reserves a local controller address, and checks authenticated BLE connectivity
    without changing any lights or pairing. Proxy access does not prove that
    every selected destination lamp is online.
-5. Each lamp appears as its own light entity. Lamps in the same network share
+4. Each lamp appears as its own light entity. Lamps in the same network share
    a serialized connection queue and durable sequence counter. Separate mesh
    networks get independent credentials and counters. Commands always address
    the selected lamp, never a broadcast group.
