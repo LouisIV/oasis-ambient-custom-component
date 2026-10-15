@@ -83,7 +83,7 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(BleakError, 'missing after discovery'):
                 async with connected_client(SimpleNamespace(name='test', address='test')):
                     self.fail('Must not send through a non-proxy connection')
-        stale.clear_cache.assert_not_awaited()
+        stale.clear_cache.assert_awaited_once()
         stale.disconnect.assert_awaited_once()
         self.assertEqual(establish.await_count, 1)
 
@@ -99,7 +99,7 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
                     self.fail('Must not send through a non-proxy connection')
         self.assertEqual(establish.await_count, 1)
         self.assertEqual(client.disconnect.await_count, 1)
-        client.clear_cache.assert_not_awaited()
+        client.clear_cache.assert_awaited_once()
 
     async def test_two_destinations_use_shared_monotonic_counter(self):
         with tempfile.TemporaryDirectory() as directory:
