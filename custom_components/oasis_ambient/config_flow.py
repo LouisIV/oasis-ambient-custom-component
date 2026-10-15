@@ -136,7 +136,12 @@ class OnboardingSteps:
             if not selected or any(key not in choices for key in selected):
                 errors['base'] = 'select_lamps'
             elif any(self._nearby(choices[key][1]['name'], choices[key][0]) is None for key in selected):
-                errors['base'] = 'not_nearby'
+                # Cloud restart is still available when discovery is the part
+                # that failed; do not require a live proxy for that recovery.
+                self._selected = selected
+                self._recovery_lamps = choices
+                self._error = 'not_nearby'
+                return await self.async_step_recovery()
             else:
                 self._selected = selected
                 self._recovery_lamps = choices

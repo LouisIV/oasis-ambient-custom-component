@@ -215,7 +215,8 @@ class ConfigFlowTests(unittest.IsolatedAsyncioTestCase):
     async def test_offline_or_ambiguous_device_does_not_create_state(self):
         self.hass.nearby = []
         result = await self.flow.async_step_lamps({'lamps': self.keys})
-        self.assertEqual(result['errors']['base'], 'not_nearby')
+        self.assertEqual(result['step_id'], 'recovery')
+        self.assertEqual(result['menu_options'], ['retry', 'software_reset'])
         self.assertIsNone(self.flow._connect_task)
         self.hass.nearby = [types.SimpleNamespace(name='OASIS_test2', address=x) for x in ('a', 'b')]
         self.assertIsNone(self.flow._nearby('OASIS_test2'))
