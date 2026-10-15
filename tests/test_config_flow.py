@@ -228,6 +228,18 @@ class ConfigFlowTests(unittest.IsolatedAsyncioTestCase):
         self.hass.nearby = [types.SimpleNamespace(name='OASIS_test2', address=x) for x in ('a', 'b')]
         self.assertIsNone(self.flow._nearby('OASIS_test2'))
 
+    async def test_connection_failure_reaches_recovery_without_undefined_choices(self):
+        self.flow._recovery_lamps = FLOW.lamp_choices([self.mesh])
+        task = asyncio.get_running_loop().create_future()
+        task.set_exception(FLOW.BleakError('proxy disconnected'))
+        self.flow._connect_task = task
+
+        result = await self.flow.async_step_finish()
+
+        self.assertEqual(result['step_id'], 'recovery')
+        self.assertEqual(result['menu_options'], ['retry', 'software_reset'])
+        self.assertIsNone(self.flow._connect_task)
+
     async def test_invalid_upload_is_recoverable(self):
         path = Path(self.directory.name) / 'bad.json'
         path.write_text('[]')

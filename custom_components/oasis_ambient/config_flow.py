@@ -174,7 +174,6 @@ class OnboardingSteps:
             self._connect_task = None
         if self._error:
             if self._error == 'cannot_connect':
-                self._recovery_lamps = choices
                 return await self.async_step_recovery()
             return await self.async_step_lamps()
         if any(item['unique_id'] in self._configured() for item in added):
