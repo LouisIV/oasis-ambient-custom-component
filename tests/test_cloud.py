@@ -68,3 +68,29 @@ class AccountTests(unittest.TestCase):
             with patch.object(CLOUD, 'build_opener', return_value=opener):
                 with self.assertRaisesRegex(CLOUD.AccountError, '^invalid_account_data$'):
                     CLOUD._read(object())
+
+    def test_restart_matches_mesh_address_and_sends_one_explicit_reboot(self):
+        node = {
+            'node_id': 'cloud-node-1',
+            'params': {'Light': {'meshUnicast': 2}},
+            'config': {'services': [{'name': 'System', 'type': 'esp.service.system',
+                                     'params': [{'name': 'Reboot', 'data_type': 'bool',
+                                                 'properties': ['write']}]}]},
+        }
+        with patch.object(CLOUD, '_login', return_value='short-lived-token'), \
+             patch.object(CLOUD, '_read', return_value={'node_details': [node]}) as read:
+            result = CLOUD.restart_account_lamp('email', 'password', 'OASIS_test2', '0002')
+        self.assertEqual(result, 'OASIS_test2')
+        request = read.call_args.args[0]
+        self.assertEqual(request.method, 'PUT')
+        self.assertIn('node_id=cloud-node-1', request.full_url)
+        self.assertEqual(json.loads(request.data), {'System': {'Reboot': True}})
+        self.assertEqual(request.get_header('Authorization'), 'short-lived-token')
+
+    def test_restart_refuses_ambiguous_or_unsupported_targets(self):
+        node = {'node_id': 'cloud-node-1', 'params': {'Light': {'meshUnicast': 2}},
+                'config': {'services': []}}
+        with patch.object(CLOUD, '_login', return_value='token'), \
+             patch.object(CLOUD, '_read', return_value={'node_details': [node]}):
+            with self.assertRaisesRegex(CLOUD.AccountError, '^restart_unsupported$'):
+                CLOUD.restart_account_lamp('email', 'password', 'lamp', '0002')

@@ -11,7 +11,7 @@ from homeassistant.helpers.selector import (FileSelector, FileSelectorConfig,
     NumberSelector, NumberSelectorConfig, SelectSelector, SelectSelectorConfig,
     TextSelector, TextSelectorConfig)
 from . import device_for, lamp_data, network_lock
-from .cloud import AccountError, fetch_account_meshes
+from .cloud import AccountError, fetch_account_meshes, restart_account_lamp
 from .const import CONF_MODE_SETTLE_DELAY, DEFAULT_MODE_SETTLE_DELAY, DOMAIN
 from .onboarding import MAX_EXPORT_BYTES, lamp_choices, mesh_identity, parse_export, reserve_sender, save_mesh
 from .protocol.oasis_controller import OasisController
@@ -27,6 +27,8 @@ class OnboardingSteps:
         self._pending = {}
         self._connect_task = None
         self._error = None
+        self._selected = []
+        self._recovery_lamps = {}
 
     async def _load_saved(self):
         if self._loaded:
@@ -136,6 +138,8 @@ class OnboardingSteps:
             elif any(self._nearby(choices[key][1]['name'], choices[key][0]) is None for key in selected):
                 errors['base'] = 'not_nearby'
             else:
+                self._selected = selected
+                self._recovery_lamps = choices
                 self._connect_task = self.hass.async_create_task(self._connect_selected(selected, choices))
                 return await self.async_step_connect()
         options = [{'value': key, 'label': f"{node['name']} — {'mesh proxy nearby' if self._nearby(node['name'], mesh) else 'not found nearby'}"}
@@ -164,6 +168,9 @@ class OnboardingSteps:
         finally:
             self._connect_task = None
         if self._error:
+            if self._error == 'cannot_connect':
+                self._recovery_lamps = choices
+                return await self.async_step_recovery()
             return await self.async_step_lamps()
         if any(item['unique_id'] in self._configured() for item in added):
             self._error = 'already_added'
@@ -174,6 +181,55 @@ class OnboardingSteps:
         self.hass.config_entries.async_update_entry(self._entry, data={'lamps': existing + added})
         await self.hass.config_entries.async_reload(self._entry.entry_id)
         return self.async_create_entry(title='', data={})
+
+    async def async_step_recovery(self, user_input=None):
+        """Offer one explicit recovery action after Bluetooth setup fails."""
+        return self.async_show_menu(step_id='recovery',
+                                    menu_options=['retry', 'software_reset'])
+
+    async def async_step_retry(self, user_input=None):
+        self._error = None
+        return await self.async_step_lamps()
+
+    async def async_step_software_reset(self, user_input=None):
+        choices = {key: value for key, value in self._recovery_lamps.items()
+                   if key in self._selected}
+        if user_input is not None:
+            selected = user_input.get('lamp')
+            if selected not in choices:
+                return self.async_show_form(step_id='software_reset',
+                                            errors={'base': 'select_lamp'},
+                                            data_schema=self._reset_schema(choices))
+            self._reset_lamp = choices[selected][1]
+            return await self.async_step_reset_login()
+        return self.async_show_form(step_id='software_reset',
+                                    data_schema=self._reset_schema(choices))
+
+    @staticmethod
+    def _reset_schema(choices):
+        return vol.Schema({vol.Required('lamp'): SelectSelector(SelectSelectorConfig(
+            options=[{'value': key, 'label': node['name']}
+                     for key, (_, node) in choices.items()]))})
+
+    async def async_step_reset_login(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            try:
+                await self.hass.async_add_executor_job(
+                    restart_account_lamp, user_input['email'], user_input['password'],
+                    self._reset_lamp['name'], self._reset_lamp['unicastAddress'])
+                return await self.async_step_reset_done()
+            except AccountError as error:
+                errors['base'] = error.code
+            except (OSError, ValueError, KeyError, TypeError, StopIteration):
+                errors['base'] = 'restart_failed'
+        return self.async_show_form(step_id='reset_login', errors=errors, data_schema=vol.Schema({
+            vol.Required('email'): TextSelector(TextSelectorConfig(type='email')),
+            vol.Required('password'): TextSelector(TextSelectorConfig(type='password')),
+        }))
+
+    async def async_step_reset_done(self, user_input=None):
+        return self.async_show_menu(step_id='reset_done', menu_options=['retry'])
 
     async def async_step_no_new_lamps(self, user_input=None):
         return await self.async_step_upload()
