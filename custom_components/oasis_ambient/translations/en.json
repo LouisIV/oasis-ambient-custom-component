@@ -72,6 +72,7 @@
       "init": {
         "title": "Add Oasis lamps",
         "menu_options": {
+          "settings": "Performance settings",
           "lamps": "Add lamps from saved configuration",
           "login": "Sign in to Oasis",
           "advanced": "Advanced setup"
@@ -93,6 +94,13 @@
         "description": "Choose the lamps to add. Setup checks access to their Bluetooth mesh network without changing the lights. A nearby proxy does not confirm that every lamp is online.",
         "data": {
           "lamps": "Lamps to add"
+        }
+      },
+      "settings": {
+        "title": "Performance settings",
+        "description": "The lamp needs a short pause after changing between white and RGB modes. Reduce this only if mode changes remain reliable.",
+        "data": {
+          "mode_settle_delay": "Mode settle delay (seconds)"
         }
       },
       "no_new_lamps": {

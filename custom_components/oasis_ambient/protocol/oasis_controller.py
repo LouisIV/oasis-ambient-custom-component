@@ -50,7 +50,7 @@ async def connected_client(device, timeout=20):
 
 class OasisController:
     def __init__(self, mesh, lamp_name, source, sequence_path, *, client_factory=connected_client,
-                 destination=None, lock=None):
+                 destination=None, lock=None, mode_settle_delay=0.3):
         nodes = [n for n in mesh['nodes'] if (int(n['unicastAddress'], 16) == destination
                  if destination is not None else n.get('name') == lamp_name)]
         if len(nodes) != 1:
@@ -83,6 +83,11 @@ class OasisController:
         self.sequence_path = Path(sequence_path)
         self.client_factory = client_factory
         self.lock = lock if lock is not None else asyncio.Lock()
+        if not isinstance(mode_settle_delay, (int, float)) or isinstance(mode_settle_delay, bool):
+            raise ValueError('Mode settle delay must be a number')
+        if not 0 <= mode_settle_delay <= 5:
+            raise ValueError('Mode settle delay must be between 0 and 5 seconds')
+        self.mode_settle_delay = float(mode_settle_delay)
 
     def _allocate(self, iv_index, initialize):
         store = SequenceStore(self.sequence_path, self.identity, self.source, iv_index,
@@ -150,10 +155,10 @@ class OasisController:
                         for chunk in fragment_proxy(0, pdu):
                             await client.write_gatt_char(PROXY_IN, chunk, response=False)
                         sequences.append(seq)
-                        if access[:3] == bytes.fromhex('cce502'):
+                        if access[:3] == bytes.fromhex('cce502') and self.mode_settle_delay:
                             # Preserve the mode-to-color spacing used in the real
                             # lamp verification; no automatic command retries.
-                            await asyncio.sleep(0.3)
+                            await asyncio.sleep(self.mode_settle_delay)
                     return sequences
                 finally:
                     await client.stop_notify(PROXY_OUT)

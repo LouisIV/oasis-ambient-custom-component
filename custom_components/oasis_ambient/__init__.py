@@ -5,15 +5,18 @@ from pathlib import Path
 
 from homeassistant.components import bluetooth
 from homeassistant.exceptions import ConfigEntryError
-from .const import DOMAIN
+from .const import CONF_MODE_SETTLE_DELAY, DEFAULT_MODE_SETTLE_DELAY, DOMAIN
 from .protocol.oasis_controller import OasisController
 from .protocol.mesh_crypto import k3
 
 
-def load_controller(data, lock=None):
+def load_controller(data, lock=None, options=None):
+    options = options or {}
     mesh = json.loads(Path(data['mesh_file']).read_text())
     return OasisController(mesh, data['lamp_name'], data['source'], data['sequence_file'],
-                           destination=data.get('destination'), lock=lock)
+                           destination=data.get('destination'), lock=lock,
+                           mode_settle_delay=options.get(CONF_MODE_SETTLE_DELAY,
+                                                         DEFAULT_MODE_SETTLE_DELAY))
 
 
 def lamp_data(entry):
@@ -70,7 +73,7 @@ async def async_setup_entry(hass, entry):
         for data in lamp_data(entry):
             # All destinations in a mesh share one radio-operation queue.
             lock = network_lock(hass, data['unique_id'].rsplit(':', 1)[0])
-            controller = await hass.async_add_executor_job(load_controller, data, lock)
+            controller = await hass.async_add_executor_job(load_controller, data, lock, entry.options)
             if not await hass.async_add_executor_job(controller.sequence_path.exists):
                 raise ValueError('Sequence state missing; do not reuse this sender address')
             controllers.append((data, controller))
