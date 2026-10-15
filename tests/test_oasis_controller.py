@@ -9,7 +9,7 @@ from pathlib import Path
 from mesh_crypto import beacon_key, cmac, k3, decrypt_network, decrypt_access
 from mesh_protocol import fragment_proxy, ProxyReassembler
 from oasis_commands import power
-from oasis_controller import OasisController, connected_client
+from oasis_controller import OasisController, clear_proxy_cache, connected_client
 
 KEY = bytes(range(16))
 MESH = {'meshUUID': 'test-only', 'netKeys': [{'index': 0, 'key': KEY.hex()}],
@@ -49,6 +49,18 @@ class FakeClient:
 
 
 class ControllerTest(unittest.IsolatedAsyncioTestCase):
+    async def test_clear_proxy_cache_disconnects_and_checks_backend_result(self):
+        client = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(return_value=True))
+        backend = SimpleNamespace(establish_connection=AsyncMock(return_value=client),
+                                  BleakClientWithServiceCache=object)
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            await clear_proxy_cache(SimpleNamespace(name='test', address='test-address'))
+        backend.establish_connection.assert_awaited_once_with(
+            object, SimpleNamespace(name='test', address='test-address'), 'test',
+            max_attempts=3, timeout=20, use_services_cache=False)
+        client.clear_cache.assert_awaited_once()
+        client.disconnect.assert_awaited_once()
+
     async def test_connector_disconnects_without_replaying_failed_batch(self):
         client = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
         establish = AsyncMock(return_value=client)

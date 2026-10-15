@@ -5,6 +5,7 @@ an old sequence database or share one sender address across independent hosts.
 """
 import asyncio
 import hashlib
+import inspect
 import logging
 from contextlib import asynccontextmanager
 from bleak.exc import BleakError
@@ -17,6 +18,31 @@ from .sequence_store import SequenceStore
 PROXY_IN = '00002add-0000-1000-8000-00805f9b34fb'
 PROXY_OUT = '00002ade-0000-1000-8000-00805f9b34fb'
 _LOGGER = logging.getLogger(__name__)
+
+
+class IncompleteProxyDiscovery(BleakError):
+    """A proxy connection exposed no usable mesh proxy characteristics."""
+
+
+async def clear_proxy_cache(device, timeout=20):
+    """Clear one known proxy's local GATT cache, without sending mesh data."""
+    from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
+
+    client = await establish_connection(
+        BleakClientWithServiceCache, device, device.name or device.address,
+        max_attempts=3, timeout=timeout, use_services_cache=False,
+    )
+    try:
+        clear_cache = getattr(client, 'clear_cache', None)
+        if clear_cache is None:
+            raise BleakError('Bluetooth backend does not support proxy cache recovery')
+        result = clear_cache()
+        if inspect.isawaitable(result):
+            result = await result
+        if result is False:
+            raise BleakError('Bluetooth backend rejected proxy cache recovery')
+    finally:
+        await client.disconnect()
 
 
 @asynccontextmanager
@@ -41,8 +67,8 @@ async def connected_client(device, timeout=20):
             _LOGGER.warning('Incomplete proxy GATT discovery for %s. '
                             'Services/characteristics: %s; disconnecting without cache removal',
                             device.address, inventory)
-            raise BleakError('Mesh proxy characteristics missing after discovery: '
-                             + ', '.join(missing))
+            raise IncompleteProxyDiscovery('Mesh proxy characteristics missing after discovery: '
+                                           + ', '.join(missing))
         yield client
     finally:
         await client.disconnect()

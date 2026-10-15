@@ -1,5 +1,6 @@
 """Adapter logic tests with explicit HA API doubles, not an HA runtime test."""
 import importlib.util
+import asyncio
 from pathlib import Path
 import sys
 import types
@@ -12,7 +13,8 @@ ROOT = Path(__file__).resolve().parents[1] / 'custom_components/oasis_ambient'
 def load_light():
     package = types.ModuleType('oasis_adapter_test')
     package.__path__ = [str(ROOT)]
-    package.device_for = lambda *_: object()
+    package.network_proxy_for = lambda *_: object()
+    package.proxy_recovery_state = lambda *_: {'lock': asyncio.Lock(), 'last_attempt': 0.0}
     ha = types.ModuleType('homeassistant')
     components = types.ModuleType('homeassistant.components')
     bluetooth = types.ModuleType('homeassistant.components.bluetooth')
@@ -52,7 +54,7 @@ class LightAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(hasattr(self.entity, 'written'))
 
     def setUp(self):
-        self.controller = types.SimpleNamespace(send=AsyncMock(), net_key=bytes(16))
+        self.controller = types.SimpleNamespace(send=AsyncMock(), net_key=bytes(16), identity='test-network')
         entry = types.SimpleNamespace(unique_id='test', data={'lamp_name': 'test', 'address': 'test'})
         self.entity = LIGHT.OasisLight(entry, self.controller)
         self.entity.hass = object()
