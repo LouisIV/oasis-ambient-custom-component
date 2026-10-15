@@ -1,5 +1,4 @@
 """Local RGB and white-light controls; state is optimistic, not polled."""
-import asyncio
 import logging
 from bleak.exc import BleakError
 from homeassistant.components import bluetooth
@@ -7,7 +6,6 @@ from homeassistant.components.light import LightEntity, ColorMode, ATTR_BRIGHTNE
 from homeassistant.exceptions import HomeAssistantError
 from . import device_for
 from .const import DOMAIN
-from .protocol.oasis_controller import IncompleteProxyDiscovery
 from .protocol import oasis_commands as commands
 
 _LOGGER = logging.getLogger(__name__)
@@ -64,34 +62,14 @@ class OasisLight(LightEntity):
             self.data['address'], connectable=True))
 
     async def _send(self, messages):
-        # A BlueZ cache refresh removes the old BLEDevice. Give the scanner a
-        # bounded window to publish the replacement address, then resolve it
-        # again. Only incomplete discovery is retried: a failure after the
-        # first write could have partially transmitted the batch.
-        deadline = asyncio.get_running_loop().time() + 15
-        cache_recovery_used = False
-        while True:
-            device = device_for(self.hass, self.data['address'], self.controller.net_key)
-            if device is None:
-                if asyncio.get_running_loop().time() >= deadline:
-                    raise HomeAssistantError('Lamp is not reachable through Home Assistant Bluetooth')
-                await asyncio.sleep(1)
-                continue
-            try:
-                await self.controller.send(device, messages)
-                return
-            except IncompleteProxyDiscovery as error:
-                if cache_recovery_used or asyncio.get_running_loop().time() >= deadline:
-                    _LOGGER.exception('Oasis BLE operation failed for %s', self.data['address'])
-                    raise HomeAssistantError('Oasis BLE command failed; state not confirmed') from error
-                cache_recovery_used = True
-                _LOGGER.warning('Oasis proxy discovery was incomplete for %s; '
-                                'waiting for Bluetooth rediscovery before retrying',
-                                self.data['address'])
-                await asyncio.sleep(2)
-            except (BleakError, TimeoutError, OSError, ValueError) as error:
-                _LOGGER.exception('Oasis BLE operation failed for %s', self.data['address'])
-                raise HomeAssistantError('Oasis BLE command failed; state not confirmed') from error
+        device = device_for(self.hass, self.data['address'], self.controller.net_key)
+        if device is None:
+            raise HomeAssistantError('Lamp is not reachable through Home Assistant Bluetooth')
+        try:
+            await self.controller.send(device, messages)
+        except (BleakError, TimeoutError, OSError, ValueError) as error:
+            _LOGGER.exception('Oasis BLE operation failed for %s', self.data['address'])
+            raise HomeAssistantError('Oasis BLE command failed; state not confirmed') from error
 
     async def async_turn_on(self, **kwargs):
         level = kwargs.get(ATTR_BRIGHTNESS)

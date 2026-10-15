@@ -5,7 +5,6 @@ an old sequence database or share one sender address across independent hosts.
 """
 import asyncio
 import hashlib
-import inspect
 import logging
 from contextlib import asynccontextmanager
 from bleak.exc import BleakError
@@ -20,13 +19,9 @@ PROXY_OUT = '00002ade-0000-1000-8000-00805f9b34fb'
 _LOGGER = logging.getLogger(__name__)
 
 
-class IncompleteProxyDiscovery(BleakError):
-    """The GATT table is incomplete before any mesh data is written."""
-
-
 @asynccontextmanager
 async def connected_client(device, timeout=20):
-    """Open a proxy connection and recover one incomplete local GATT cache."""
+    """Retry connection establishment only; never replay an access-message batch."""
     from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
 
     client = await establish_connection(
@@ -44,15 +39,10 @@ async def connected_client(device, timeout=20):
                           [char.uuid for char in service.characteristics])
                          for service in client.services]
             _LOGGER.warning('Incomplete proxy GATT discovery for %s. '
-                            'Services/characteristics: %s; clearing the local cache once',
+                            'Services/characteristics: %s; disconnecting without cache removal',
                             device.address, inventory)
-            clear_cache = getattr(client, 'clear_cache', None)
-            if clear_cache is not None:
-                result = clear_cache()
-                if inspect.isawaitable(result):
-                    await result
-            raise IncompleteProxyDiscovery('Mesh proxy characteristics missing after discovery: '
-                                            + ', '.join(missing))
+            raise BleakError('Mesh proxy characteristics missing after discovery: '
+                             + ', '.join(missing))
         yield client
     finally:
         await client.disconnect()
