@@ -2,6 +2,7 @@
 import json
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.parse import urlencode
 
 from .onboarding import MAX_EXPORT_BYTES, parse_export
 
@@ -44,8 +45,8 @@ def _read(request):
     return value
 
 
-def fetch_account_meshes(email, password):
-    """Run in the executor; return mesh data only, never account credentials."""
+def _login(email, password):
+    """Return a short-lived account token for one explicit cloud action."""
     login = _read(Request(API + '/login2',
         data=json.dumps({'user_name': email.strip(), 'password': password}).encode(),
         headers={'Content-Type': 'application/json', 'Accept': 'application/json'}))
@@ -56,6 +57,12 @@ def fetch_account_meshes(email, password):
     token = login.get('accesstoken')
     if not isinstance(token, str) or not token:
         raise AccountError('invalid_account_data')
+    return token
+
+
+def fetch_account_meshes(email, password):
+    """Run in the executor; return mesh data only, never account credentials."""
+    token = _login(email, password)
     groups = _read(Request(API + '/user/node_group',
                           headers={'Authorization': token, 'Accept': 'application/json'}))
     try:
@@ -78,3 +85,53 @@ def fetch_account_meshes(email, password):
     if not meshes:
         raise AccountError('no_lamps')
     return list(meshes.values())
+
+
+def restart_account_lamp(email, password, lamp_name, unicast_address):
+    """Restart one lamp through Oasis after explicit user confirmation.
+
+    The access token remains local to this executor call and is never returned
+    to the config flow or written to Home Assistant storage.
+    """
+    token = _login(email, password)
+    nodes = _read(Request(API + '/user/nodes?node_details=true',
+                          headers={'Authorization': token, 'Accept': 'application/json'}))
+    expected_address = int(unicast_address, 16)
+    matches = []
+    for node in nodes.get('node_details', []):
+        params = node.get('params') or {}
+        values = [value for value in params.values() if isinstance(value, dict)]
+        mesh_address = next((value.get('meshUnicast') for value in values
+                             if value.get('meshUnicast') is not None), None)
+        if mesh_address is None:
+            continue
+        try:
+            if isinstance(mesh_address, str):
+                try:
+                    actual_address = int(mesh_address, 0)
+                except ValueError:
+                    actual_address = int(mesh_address, 16)
+            else:
+                actual_address = int(mesh_address)
+            if actual_address == expected_address:
+                matches.append(node)
+        except (TypeError, ValueError):
+            continue
+    if len(matches) != 1:
+        raise AccountError('lamp_not_found')
+    node = matches[0]
+    services = [service for service in node.get('config', {}).get('services', [])
+                if service.get('type') == 'esp.service.system']
+    reboot = [param for service in services for param in service.get('params', [])
+              if param.get('name') == 'Reboot'
+              and param.get('data_type') == 'bool'
+              and 'write' in param.get('properties', [])]
+    node_id = node.get('node_id')
+    if len(services) != 1 or len(reboot) != 1 or not isinstance(node_id, str) or not node_id:
+        raise AccountError('restart_unsupported')
+    payload = {services[0]['name']: {'Reboot': True}}
+    _read(Request(API + '/user/nodes/params?' + urlencode({'node_id': node_id}),
+                  data=json.dumps(payload).encode(), method='PUT',
+                  headers={'Authorization': token, 'Content-Type': 'application/json',
+                           'Accept': 'application/json'}))
+    return lamp_name

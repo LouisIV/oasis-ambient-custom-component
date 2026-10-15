@@ -32,6 +32,36 @@
         "title": "No additional lamps in this export",
         "description": "No additional supported lamps were found in the loaded configuration. To check your Oasis account for newly paired lamps, close this dialog and choose Sign in to Oasis. Select Submit to import an updated file instead."
       },
+      "recovery": {
+        "title": "Setup troubleshooting",
+        "description": "Bluetooth setup could not reach the lamp. Retry first, or restart one selected lamp through Oasis and then retry setup.",
+        "menu_options": {
+          "retry": "Retry setup",
+          "software_reset": "Restart a lamp"
+        }
+      },
+      "software_reset": {
+        "title": "Restart a lamp",
+        "description": "This sends one software restart through Oasis. It does not reset pairing, mesh keys, or lamp settings. The lamp may disappear briefly while it restarts.",
+        "data": {
+          "lamp": "Lamp"
+        }
+      },
+      "reset_login": {
+        "title": "Confirm Oasis access",
+        "description": "Sign in again to authorize this one-time restart. Your password and token are not saved.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "reset_done": {
+        "title": "Restart sent",
+        "description": "The restart request was sent. Wait about 30 seconds for the lamp to advertise again, then retry setup.",
+        "menu_options": {
+          "retry": "Retry setup"
+        }
+      },
       "login": {
         "title": "Sign in to Oasis",
         "description": "Use your Oasis email and password to find your lamps. Home Assistant sends them to Oasis to retrieve your lamp configuration; your password and account tokens are not saved. Daily lighting control stays local.",
@@ -64,7 +94,11 @@
       "account_unavailable": "Could not reach Oasis. Check your internet connection and try again.",
       "rate_limited": "Oasis is limiting sign-in attempts. Wait a few minutes before trying again.",
       "invalid_account_data": "Oasis returned a lamp configuration we could not read. Try again or use Advanced setup to import a credential file.",
-      "additional_auth_required": "This account requires an additional sign-in step that is not supported here yet. Use Advanced setup and the browser-based exporter."
+      "additional_auth_required": "This account requires an additional sign-in step that is not supported here yet. Use Advanced setup and the browser-based exporter.",
+      "select_lamp": "Choose a lamp to restart.",
+      "restart_failed": "The restart request could not be sent. No lamp settings were changed.",
+      "lamp_not_found": "Oasis could not match this lamp to an account device. Retry setup or use the Oasis app.",
+      "restart_unsupported": "Oasis does not expose a software restart for this lamp. Retry setup or use the Oasis app."
     }
   },
   "options": {
@@ -107,6 +141,36 @@
         "title": "No additional lamps",
         "description": "No additional supported lamps were found in the loaded configuration. To check your Oasis account for newly paired lamps, close this dialog and choose Sign in to Oasis. Select Submit to import an updated file instead."
       },
+      "recovery": {
+        "title": "Setup troubleshooting",
+        "description": "Bluetooth setup could not reach the lamp. Retry first, or restart one selected lamp through Oasis and then retry setup.",
+        "menu_options": {
+          "retry": "Retry setup",
+          "software_reset": "Restart a lamp"
+        }
+      },
+      "software_reset": {
+        "title": "Restart a lamp",
+        "description": "This sends one software restart through Oasis. It does not reset pairing, mesh keys, or lamp settings. The lamp may disappear briefly while it restarts.",
+        "data": {
+          "lamp": "Lamp"
+        }
+      },
+      "reset_login": {
+        "title": "Confirm Oasis access",
+        "description": "Sign in again to authorize this one-time restart. Your password and token are not saved.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "reset_done": {
+        "title": "Restart sent",
+        "description": "The restart request was sent. Wait about 30 seconds for the lamp to advertise again, then retry setup.",
+        "menu_options": {
+          "retry": "Retry setup"
+        }
+      },
       "login": {
         "title": "Sign in to Oasis",
         "description": "Use your Oasis email and password to find your lamps. Home Assistant sends them to Oasis to retrieve your lamp configuration; your password and account tokens are not saved. Daily lighting control stays local.",
@@ -139,7 +203,11 @@
       "account_unavailable": "Could not reach Oasis. Check your internet connection and try again.",
       "rate_limited": "Oasis is limiting sign-in attempts. Wait a few minutes before trying again.",
       "invalid_account_data": "Oasis returned a lamp configuration we could not read. Try again or use Advanced setup to import a credential file.",
-      "additional_auth_required": "This account requires an additional sign-in step that is not supported here yet. Use Advanced setup and the browser-based exporter."
+      "additional_auth_required": "This account requires an additional sign-in step that is not supported here yet. Use Advanced setup and the browser-based exporter.",
+      "select_lamp": "Choose a lamp to restart.",
+      "restart_failed": "The restart request could not be sent. No lamp settings were changed.",
+      "lamp_not_found": "Oasis could not match this lamp to an account device. Retry setup or use the Oasis app.",
+      "restart_unsupported": "Oasis does not expose a software restart for this lamp. Retry setup or use the Oasis app."
     }
   }
 }
