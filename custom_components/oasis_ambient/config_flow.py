@@ -287,6 +287,14 @@ class OasisConfigFlow(OnboardingSteps, config_entries.ConfigFlow, domain=DOMAIN)
     def __init__(self):
         self._start()
 
+    async def async_step_bluetooth(self, discovery_info):
+        """Handle discovery of a nearby Bluetooth Mesh Proxy."""
+        # Discovery is only a prompt to start setup. The proxy advertisement
+        # does not contain enough information to identify an Oasis account or
+        # a lamp, so never create an entry from Bluetooth alone.
+        self._discovery_info = discovery_info
+        return await self.async_step_user()
+
     async def async_step_user(self, user_input=None):
         return self.async_show_menu(step_id='user', menu_options=['login', 'advanced'])
 

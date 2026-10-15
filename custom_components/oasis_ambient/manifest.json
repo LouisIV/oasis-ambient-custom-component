@@ -10,6 +10,12 @@
     "bluetooth_adapters",
     "file_upload"
   ],
+  "bluetooth": [
+    {
+      "connectable": true,
+      "service_uuid": "00001828-0000-1000-8000-00805f9b34fb"
+    }
+  ],
   "iot_class": "assumed_state",
   "requirements": [],
   "codeowners": ["@LouisIV"]

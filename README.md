@@ -49,9 +49,12 @@ Copy `custom_components/oasis_ambient` into Home Assistant's
 1. Enable Home Assistant's Bluetooth integration. A connectable local adapter
    or active ESPHome Bluetooth proxy must be within range. The integration
    uses Home Assistant's Bluetooth device lookup, not an independent scanner.
-2. Add **Oasis Ambient Local BLE** in Devices & services. Choose **Sign in to
-   Oasis** and enter your Oasis email and password. Home Assistant retrieves
-   your mesh configuration directly from Oasis. The integration does not save
+2. When Home Assistant sees an Oasis Bluetooth Mesh Proxy, **Oasis Ambient
+   Local BLE** appears automatically under **Devices & services → Discovered**.
+   Select **Set up**, then choose **Sign in to Oasis** and enter your Oasis
+   email and password. You can also add the integration manually. Home
+   Assistant retrieves your mesh configuration directly from Oasis. The
+   integration does not save
    your password or account tokens.
 3. Select your lamps. Home Assistant discovers a nearby proxy for each mesh,
    reserves a local controller address, and checks authenticated BLE connectivity

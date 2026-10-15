@@ -122,6 +122,13 @@ class ConfigFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.flow.async_step_user())['menu_options'], ['login', 'advanced'])
         self.assertEqual((await self.flow.async_step_advanced())['menu_options'], ['upload', 'export'])
 
+    async def test_bluetooth_discovery_opens_setup_without_creating_entry(self):
+        discovery_info = types.SimpleNamespace(address='proxy-address', name='OASIS_proxy')
+        result = await self.flow.async_step_bluetooth(discovery_info)
+        self.assertEqual(result['type'], 'menu')
+        self.assertEqual(result['step_id'], 'user')
+        self.assertIs(self.flow._discovery_info, discovery_info)
+
     def proxy(self, address, key, rssi=-40, name='renamed'):
         from protocol.mesh_crypto import k3
         return types.SimpleNamespace(name=name, address=address, rssi=rssi,

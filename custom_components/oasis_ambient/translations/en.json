@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Connect your Oasis lamps",
-        "description": "Sign in to Oasis, then choose the lamps to control from Home Assistant.",
+        "description": "A nearby Oasis Bluetooth Mesh Proxy was found. Sign in to Oasis, then choose the lamps to control from Home Assistant. Discovery only finds the proxy; it does not identify or add a lamp by itself.",
         "menu_options": {
           "login": "Sign in to Oasis",
           "advanced": "Advanced setup"
