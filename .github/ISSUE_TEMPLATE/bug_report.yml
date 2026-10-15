@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a reproducible problem with the integration
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include passwords, credential exports, mesh keys, tokens, sequence databases, or unredacted Bluetooth captures.
+  - type: input
+    id: version
+    attributes:
+      label: Integration version
+      placeholder: 0.3.6
+    validations:
+      required: true
+  - type: input
+    id: home_assistant
+    attributes:
+      label: Home Assistant version
+      placeholder: 2026.10.1
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: 3.13
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware and firmware
+      description: Include lamp model, firmware, adapter or ESPHome proxy, and approximate distance.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: Tell us exactly what you did and what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact credentials, mesh data, tokens, and device-identifying data.
+      render: text
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
