@@ -7,10 +7,12 @@ from homeassistant import config_entries
 from homeassistant.components import bluetooth
 from homeassistant.components.file_upload import process_uploaded_file
 from homeassistant.core import callback
-from homeassistant.helpers.selector import FileSelector, FileSelectorConfig, SelectSelector, SelectSelectorConfig, TextSelector, TextSelectorConfig
+from homeassistant.helpers.selector import (FileSelector, FileSelectorConfig,
+    NumberSelector, NumberSelectorConfig, SelectSelector, SelectSelectorConfig,
+    TextSelector, TextSelectorConfig)
 from . import device_for, lamp_data, network_lock
 from .cloud import AccountError, fetch_account_meshes
-from .const import DOMAIN
+from .const import CONF_MODE_SETTLE_DELAY, DEFAULT_MODE_SETTLE_DELAY, DOMAIN
 from .onboarding import MAX_EXPORT_BYTES, lamp_choices, mesh_identity, parse_export, reserve_sender, save_mesh
 from .protocol.oasis_controller import OasisController
 
@@ -243,4 +245,14 @@ class OasisOptionsFlow(OnboardingSteps, config_entries.OptionsFlow):
         self._start(entry)
 
     async def async_step_init(self, user_input=None):
-        return self.async_show_menu(step_id='init', menu_options=['lamps', 'login', 'advanced'])
+        return self.async_show_menu(step_id='init', menu_options=['settings', 'lamps', 'login', 'advanced'])
+
+    async def async_step_settings(self, user_input=None):
+        if user_input is not None:
+            return self.async_create_entry(title='', data=user_input)
+        return self.async_show_form(step_id='settings', data_schema=vol.Schema({
+            vol.Required(CONF_MODE_SETTLE_DELAY,
+                         default=getattr(self.config_entry, 'options', {}).get(CONF_MODE_SETTLE_DELAY,
+                                                               DEFAULT_MODE_SETTLE_DELAY)):
+                NumberSelector(NumberSelectorConfig(min=0, max=5, step=0.05, mode='box')),
+        }))

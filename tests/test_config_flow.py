@@ -55,8 +55,8 @@ def load_flow():
         def __call__(self, value):
             return value
     selectors = mods['homeassistant.helpers.selector']
-    selectors.FileSelector = selectors.SelectSelector = selectors.TextSelector = Selector
-    selectors.FileSelectorConfig = selectors.SelectSelectorConfig = selectors.TextSelectorConfig = dict
+    selectors.FileSelector = selectors.NumberSelector = selectors.SelectSelector = selectors.TextSelector = Selector
+    selectors.FileSelectorConfig = selectors.NumberSelectorConfig = selectors.SelectSelectorConfig = selectors.TextSelectorConfig = dict
     with patch.dict(sys.modules, mods):
         spec = importlib.util.spec_from_file_location('oasis_flow_test', ROOT / '__init__.py',
                                                      submodule_search_locations=[str(ROOT)])
