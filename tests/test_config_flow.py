@@ -27,6 +27,10 @@ class FlowBase:
         return dict(type='progress_done', **kwargs)
     def async_create_entry(self, **kwargs):
         return dict(type='create_entry', **kwargs)
+    async def async_set_unique_id(self, unique_id):
+        self.unique_id = unique_id
+    def _abort_if_unique_id_configured(self):
+        return None
 
 
 def load_flow():
@@ -130,6 +134,21 @@ class ConfigFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result['step_id'], 'user')
         self.assertIs(self.flow._discovery_info, discovery_info)
         self.assertEqual(self.flow.context['title_placeholders'], {'name': 'OASIS_proxy'})
+        self.assertEqual(self.flow.unique_id, 'address:proxy-address')
+
+    async def test_bluetooth_discovery_deduplicates_address_and_name_aliases(self):
+        network_id = b'\x00' + bytes.fromhex('0123456789abcdef')
+        discovery_info = types.SimpleNamespace(
+            address='proxy-address', name='OASIS_965bac',
+            service_data={FLOW.PROXY_SERVICE_UUID: network_id})
+        self.flow.context = {}
+        await self.flow.async_step_bluetooth(discovery_info)
+        self.assertEqual(self.flow.unique_id, 'network:000123456789abcdef')
+
+    async def test_bluetooth_discovery_falls_back_to_address_without_network_id(self):
+        self.flow.context = {}
+        await self.flow.async_step_bluetooth(types.SimpleNamespace(address='proxy-address'))
+        self.assertEqual(self.flow.unique_id, 'address:proxy-address')
 
     async def test_bluetooth_discovery_uses_clear_fallback_name(self):
         self.flow.context = {}
