@@ -17,6 +17,9 @@ from .onboarding import MAX_EXPORT_BYTES, lamp_choices, mesh_identity, parse_exp
 from .protocol.oasis_controller import OasisController
 
 
+PROXY_SERVICE_UUID = '00001828-0000-1000-8000-00805f9b34fb'
+
+
 class OnboardingSteps:
     """Shared first-run and add-lamps flow. Secret material never enters forms."""
 
@@ -296,10 +299,27 @@ class OasisConfigFlow(OnboardingSteps, config_entries.ConfigFlow, domain=DOMAIN)
         # Discovery is only a prompt to start setup. The proxy advertisement
         # does not contain enough information to identify an Oasis account or
         # a lamp, so never create an entry from Bluetooth alone.
+        unique_id = self._discovery_unique_id(discovery_info)
+        if unique_id is not None:
+            await self.async_set_unique_id(unique_id)
+            self._abort_if_unique_id_configured()
         self._discovery_info = discovery_info
         proxy_name = getattr(discovery_info, 'name', None) or 'Bluetooth Mesh Proxy'
         self.context['title_placeholders'] = {'name': proxy_name}
         return await self.async_step_user()
+
+    @staticmethod
+    def _discovery_unique_id(discovery_info):
+        """Return an identity stable across Bluetooth address/name aliases."""
+        service_data = getattr(discovery_info, 'service_data', {}) or {}
+        network_id = service_data.get(PROXY_SERVICE_UUID)
+        if isinstance(network_id, (bytes, bytearray)) and len(network_id) == 9 and network_id[0] == 0:
+            # The Mesh Network ID is part of the proxy advertisement and is
+            # stable even when HA reports the same device under another name
+            # or a rotated Bluetooth address.
+            return f'network:{bytes(network_id).hex()}'
+        address = getattr(discovery_info, 'address', None)
+        return f'address:{address}' if address else None
 
     async def async_step_user(self, user_input=None):
         return self.async_show_menu(step_id='user', menu_options=['login', 'advanced'])
