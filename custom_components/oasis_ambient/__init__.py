@@ -67,12 +67,6 @@ def network_proxy_for(hass, net_key):
     return device_for(hass, None, net_key, network_only=True)
 
 
-def proxy_recovery_state(hass, identity):
-    """Return serialized, rate-limited cache-recovery state for one mesh."""
-    states = hass.data.setdefault(DOMAIN, {}).setdefault('_proxy_recovery', {})
-    return states.setdefault(identity, {'lock': asyncio.Lock(), 'last_attempt': 0.0})
-
-
 def network_lock(hass, identity):
     locks = hass.data.setdefault(DOMAIN, {}).setdefault('_network_locks', {})
     return locks.setdefault(identity, asyncio.Lock())

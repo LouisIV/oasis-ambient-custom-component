@@ -166,3 +166,49 @@ characteristics 2ADD and 2ADE. The diagnostic connection was disconnected.
 This strongly supports stale/incomplete Pi GATT cache as the immediate cause.
 Successful onboarding authentication and repeated light control still require
 a new setup attempt; GATT service recovery alone does not establish either.
+
+## Live stability investigation (October 20)
+
+With HA 2026.10.1 and the Pi's built-in adapter, the owner reported idle
+unavailability and inability to reconnect. Before a lamp power cycle, HA's
+scanner was receiving other devices but had no Oasis proxy. After the owner
+power-cycled the lamp, the proxy returned with RSSI about -45 dBm, while the
+light entity remained unavailable. Reloading only Oasis changed the entity to
+unknown (available, with no confirmed lighting state).
+
+One HA turn-on attempt failed with both proxy characteristics absent. Logs
+confirmed that the adapter still invoked cache removal and a second connection
+after the transport raised IncompleteProxyDiscovery. The installed light.py
+matched the repository HEAD before this thread's changes.
+
+An independent read-only Mac inspection found both 2ADD and 2ADE and read
+firmware 2.32.1 / ambient_2_0. A subsequent direct BlueZ diagnostic connection
+on the Pi reached ServicesResolved=true and exposed both characteristics.
+It was disconnected explicitly. No additional manual RemoveDevice, pairing,
+provisioning, reset, or sequence-state changes were needed in this sequence.
+The next HA turn-on call completed successfully and the entity reported on.
+This verifies successful command transmission, not physical light readback.
+The exact reason that the GATT table recovered is not established.
+
+Changes prepared from these observations remove the adapter's automatic cache
+recovery and reconcile availability every 30 seconds from HA's existing live
+Bluetooth discovery cache. The latter opens no connection and sends no mesh
+traffic. Regression tests cover missed-callback reconciliation, cleanup,
+failed-command state preservation, cancellation, and no automatic replay.
+
+The patched light.py was deployed directly to the owner's HA installation after
+verifying the original SHA-256 matched repository HEAD. The original file was
+preserved as light.py.before-stability-20261020. The deployed file's SHA-256 is
+c28e92622796fbbd27baced0708d941542ef880b29c7f250791731fa18c47f61.
+`ha core check` passed, and HA was restarted once. Bluetooth and Oasis both
+loaded without reported errors; a post-restart turn-on call succeeded. Local
+validation passed all 88 protocol/adapter tests. This is a local hotfix, not a
+published HACS release; a future HACS update can replace it.
+
+After restart, a second explicit turn-on command about three minutes after the
+first also completed successfully. Eight availability samples over two minutes
+all reported on, with no Oasis/Bluetooth errors in HA's system log. Adaptive
+Lighting remained enabled; its configuration includes the Oasis light with a
+90-second interval, so absence of user actions does not imply absence of
+background commands. No automation settings were changed. This short
+observation does not establish long-term reliability or physical readback.

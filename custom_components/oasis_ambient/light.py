@@ -1,13 +1,14 @@
 """Local RGB and white-light controls; state is optimistic, not polled."""
-import asyncio
 import logging
+from datetime import timedelta
 from bleak.exc import BleakError
 from homeassistant.components import bluetooth
 from homeassistant.components.light import LightEntity, ColorMode, ATTR_BRIGHTNESS, ATTR_COLOR_TEMP_KELVIN, ATTR_RGB_COLOR
+from homeassistant.core import callback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.exceptions import HomeAssistantError
-from . import network_proxy_for, proxy_recovery_state
+from . import network_proxy_for
 from .const import DOMAIN
-from .protocol.oasis_controller import IncompleteProxyDiscovery, clear_proxy_cache
 from .protocol import oasis_commands as commands
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,12 +46,19 @@ class OasisLight(LightEntity):
     def available(self):
         return network_proxy_for(self.hass, self.controller.net_key) is not None
 
+    @callback
     def _bluetooth_changed(self, *_):
         # Scanner callbacks may run before the live backend device list is
         # updated. Recompute availability on the next event-loop iteration.
         self.async_schedule_update_ha_state()
 
     async def async_added_to_hass(self):
+        # Advertisement callbacks can be deduplicated or precede updates to the
+        # scanner backend. Reconcile from HA's live discovery cache periodically
+        # so returning/rotated proxies do not require an integration reload.
+        # This does not connect to a lamp or send mesh messages.
+        self.async_on_remove(async_track_time_interval(
+            self.hass, self._bluetooth_changed, timedelta(seconds=30)))
         self.async_on_remove(bluetooth.async_register_callback(
             self.hass, self._bluetooth_changed,
             {'address': self.data['address'], 'connectable': True},
@@ -64,48 +72,17 @@ class OasisLight(LightEntity):
             self.data['address'], connectable=True))
 
     async def _send(self, messages):
-        state = proxy_recovery_state(self.hass, self.controller.identity)
-        async with state['lock']:
-            device = network_proxy_for(self.hass, self.controller.net_key)
-            if device is None:
-                raise HomeAssistantError('Lamp is not reachable through Home Assistant Bluetooth')
-            try:
-                await self.controller.send(device, messages)
-                return
-            except IncompleteProxyDiscovery as error:
-                now = asyncio.get_running_loop().time()
-                if now - state['last_attempt'] < 300:
-                    _LOGGER.exception('Oasis BLE operation failed for %s; cache recovery is rate limited',
-                                      self.data['address'])
-                    raise HomeAssistantError('Oasis BLE command failed; state not confirmed') from error
-                state['last_attempt'] = now
-                try:
-                    await clear_proxy_cache(device)
-                except (BleakError, TimeoutError, OSError) as recovery_error:
-                    _LOGGER.exception('Oasis proxy cache recovery failed for %s', self.data['address'])
-                    raise HomeAssistantError('Oasis BLE command failed; state not confirmed') from recovery_error
-
-                # Cache removal can make the old BLEDevice invalid. Resolve a
-                # fresh, positively mesh-identified advertisement before retrying.
-                deadline = asyncio.get_running_loop().time() + 15
-                fresh = None
-                while asyncio.get_running_loop().time() < deadline:
-                    fresh = network_proxy_for(self.hass, self.controller.net_key)
-                    if fresh is not None:
-                        break
-                    await asyncio.sleep(1)
-                if fresh is None:
-                    raise HomeAssistantError('Lamp is not reachable through Home Assistant Bluetooth') from error
-                try:
-                    await self.controller.send(fresh, messages)
-                    return
-                except (BleakError, TimeoutError, OSError, ValueError) as retry_error:
-                    _LOGGER.exception('Oasis BLE operation failed after proxy recovery for %s',
-                                      self.data['address'])
-                    raise HomeAssistantError('Oasis BLE command failed; state not confirmed') from retry_error
-            except (BleakError, TimeoutError, OSError, ValueError) as error:
-                _LOGGER.exception('Oasis BLE operation failed for %s', self.data['address'])
-                raise HomeAssistantError('Oasis BLE command failed; state not confirmed') from error
+        device = network_proxy_for(self.hass, self.controller.net_key)
+        if device is None:
+            raise HomeAssistantError('Lamp is not reachable through Home Assistant Bluetooth')
+        try:
+            # The controller serializes each mesh's commands. Incomplete GATT
+            # discovery must also fail here without cache removal or replay:
+            # Linux cache clearing can remove the device from BlueZ entirely.
+            await self.controller.send(device, messages)
+        except (BleakError, TimeoutError, OSError, ValueError) as error:
+            _LOGGER.exception('Oasis BLE operation failed for %s', device.address)
+            raise HomeAssistantError('Oasis BLE command failed; state not confirmed') from error
 
     async def async_turn_on(self, **kwargs):
         level = kwargs.get(ATTR_BRIGHTNESS)
