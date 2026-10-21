@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- Recheck Bluetooth availability every 30 seconds from Home Assistant's live
+  discovery cache, without connecting or sending commands, so missed callbacks
+  do not leave a rediscovered lamp stuck unavailable.
+
+- Removed automatic Bluetooth cache removal and reconnect from the light-control
+  error handler. It was still running after incomplete GATT discovery despite
+  the transport's fail-without-recovery behavior. Failed commands now preserve
+  the original error and leave optimistic light state unchanged. Hardware
+  validation is still needed; this is not a confirmed fix for app crashes or
+  disappearing lamp advertisements.
+
 ## [0.3.6] - 2026-10-15
 
 This is an experimental public beta. Home Assistant/Pi control through a

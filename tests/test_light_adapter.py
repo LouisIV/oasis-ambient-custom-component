@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 import types
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1] / 'custom_components/oasis_ambient'
 
@@ -13,8 +13,11 @@ ROOT = Path(__file__).resolve().parents[1] / 'custom_components/oasis_ambient'
 def load_light():
     package = types.ModuleType('oasis_adapter_test')
     package.__path__ = [str(ROOT)]
-    package.network_proxy_for = lambda *_: object()
-    package.proxy_recovery_state = lambda *_: {'lock': asyncio.Lock(), 'last_attempt': 0.0}
+    package.network_proxy_for = lambda *_: types.SimpleNamespace(address="current-proxy")
+    core = types.ModuleType('homeassistant.core')
+    core.callback = lambda f: f
+    event = types.ModuleType('homeassistant.helpers.event')
+    event.async_track_time_interval = Mock()
     ha = types.ModuleType('homeassistant')
     components = types.ModuleType('homeassistant.components')
     bluetooth = types.ModuleType('homeassistant.components.bluetooth')
@@ -33,6 +36,8 @@ def load_light():
     exceptions = types.ModuleType('homeassistant.exceptions')
     exceptions.HomeAssistantError = RuntimeError
     modules = {'oasis_adapter_test': package, 'homeassistant': ha,
+               'homeassistant.core': core,
+               'homeassistant.helpers.event': event,
                'homeassistant.components': components,
                'homeassistant.components.bluetooth': bluetooth,
                'homeassistant.components.light': light,
@@ -41,10 +46,11 @@ def load_light():
         spec = importlib.util.spec_from_file_location('oasis_adapter_test.light', ROOT / 'light.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-    return module
+        controller_module = importlib.import_module('oasis_adapter_test.protocol.oasis_controller')
+    return module, controller_module.IncompleteProxyDiscovery
 
 
-LIGHT = load_light()
+LIGHT, IncompleteProxyDiscovery = load_light()
 
 
 class LightAdapterTests(unittest.IsolatedAsyncioTestCase):
@@ -52,6 +58,30 @@ class LightAdapterTests(unittest.IsolatedAsyncioTestCase):
         self.entity._bluetooth_changed(object(), object())
         self.assertTrue(self.entity.scheduled)
         self.assertFalse(hasattr(self.entity, 'written'))
+
+    async def test_periodic_reconciliation_recovers_without_advertisement_callback(self):
+        removals = []
+        self.entity.async_on_remove = removals.append
+        cancel_timer = Mock()
+        with patch.object(LIGHT, 'async_track_time_interval', return_value=cancel_timer) as timer, \
+             patch.object(LIGHT.bluetooth, 'async_register_callback', create=True), \
+             patch.object(LIGHT.bluetooth, 'async_track_unavailable', create=True), \
+             patch.object(LIGHT.bluetooth, 'BluetoothScanningMode',
+                          types.SimpleNamespace(ACTIVE='active', PASSIVE='passive'), create=True):
+            await self.entity.async_added_to_hass()
+        tick = timer.call_args.args[1]
+        self.assertEqual(timer.call_args.args[2].total_seconds(), 30)
+        for proxy in (None, types.SimpleNamespace(address='rotated-proxy'), None):
+            with patch.object(LIGHT, 'network_proxy_for', return_value=proxy):
+                self.entity.scheduled = False
+                tick(None)
+                self.assertTrue(self.entity.scheduled)
+                self.assertEqual(self.entity.available, proxy is not None)
+        self.controller.send.assert_not_awaited()
+        self.assertIn(cancel_timer, removals)
+        for remove in removals:
+            remove()
+        cancel_timer.assert_called_once()
 
     def setUp(self):
         self.controller = types.SimpleNamespace(send=AsyncMock(), net_key=bytes(16), identity='test-network')
@@ -92,6 +122,36 @@ class LightAdapterTests(unittest.IsolatedAsyncioTestCase):
             await self.entity.async_turn_on(rgb_color=(0, 255, 0))
         self.assertIsNone(self.entity._attr_is_on)
         self.assertIsNone(self.entity._attr_rgb_color)
+
+    async def test_incomplete_discovery_does_not_clear_cache_or_retry(self):
+        error = IncompleteProxyDiscovery('Missing proxy output characteristic')
+        self.controller.send.side_effect = error
+        backend = types.SimpleNamespace(establish_connection=AsyncMock(),
+                                        BleakClientWithServiceCache=object)
+        with patch.dict(sys.modules, {'bleak_retry_connector': backend}):
+            with self.assertRaisesRegex(RuntimeError, 'state not confirmed') as raised:
+                await self.entity.async_turn_on(rgb_color=(0, 255, 0))
+        self.assertIs(raised.exception.__cause__, error)
+        self.controller.send.assert_awaited_once()
+        backend.establish_connection.assert_not_awaited()
+        self.assertIsNone(self.entity._attr_is_on)
+        self.assertIsNone(self.entity._attr_rgb_color)
+        self.assertFalse(hasattr(self.entity, 'written'))
+
+    async def test_unreachable_proxy_does_not_send(self):
+        with patch.object(LIGHT, 'network_proxy_for', return_value=None):
+            with self.assertRaisesRegex(RuntimeError, 'not reachable'):
+                await self.entity.async_turn_off()
+        self.controller.send.assert_not_awaited()
+        self.assertIsNone(self.entity._attr_is_on)
+
+    async def test_cancelled_command_is_not_retried_or_reported_as_success(self):
+        self.controller.send.side_effect = asyncio.CancelledError()
+        with self.assertRaises(asyncio.CancelledError):
+            await self.entity.async_turn_off()
+        self.controller.send.assert_awaited_once()
+        self.assertIsNone(self.entity._attr_is_on)
+        self.assertFalse(hasattr(self.entity, 'written'))
 
     async def test_conflicting_modes_rejected_before_transmit(self):
         with self.assertRaises(RuntimeError):

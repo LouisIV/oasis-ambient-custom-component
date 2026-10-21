@@ -163,17 +163,20 @@ entries continue working and can use Configure to add more lamps.
 - Do not copy a configured entry and counter database to a second live host.
 - A phone's BLE inspection app can occupy the lamp connection; disconnect it.
 - Connection establishment uses `bleak-retry-connector` supplied by Home
-  Assistant's Bluetooth dependency. If a positively identified mesh proxy has
-  an incomplete GATT table, the integration performs one serialized,
-  rate-limited local cache recovery, waits for a fresh mesh advertisement, and
-  resolves the current proxy address again. Recovery is never attempted from
-  a saved address alone, and partially transmitted commands are never
-  automatically replayed.
+  Assistant's Bluetooth dependency. If a mesh proxy exposes an incomplete GATT
+  table, the integration logs the discovered services and characteristics,
+  disconnects, and reports the command failure. It does not automatically clear
+  the Bluetooth cache or reconnect after that failure: on Linux, cache clearing
+  can remove the device from BlueZ. Command batches are never automatically
+  replayed after a send failure.
 - Proxy discovery also matches the Mesh Network ID, so a missing advertised
   name or changed proxy address does not require reimporting credentials.
   A proxy on the same mesh may carry another lamp's addressed commands.
   A live scanner backend and authenticated secure beacon are still required;
   cached advertisement history alone is not treated as reachability.
+- Availability is reconciled every 30 seconds from Home Assistant's live
+  Bluetooth discovery cache, in addition to advertisement callbacks. This
+  does not connect to the lamp or send lighting commands.
 - A successful HA service response alone is not proof of control: HA may skip
   unavailable entities. Check the entity state and logs, and verify the physical
   lamp. Connection failures now include the underlying exception in HA logs.
