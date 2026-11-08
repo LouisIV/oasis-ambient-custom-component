@@ -46,32 +46,46 @@ async def clear_proxy_cache(device, timeout=20):
 
 
 @asynccontextmanager
-async def connected_client(device, timeout=20):
+async def connected_client(device, timeout=20, *, prepare=None):
     """Retry connection establishment only; never replay an access-message batch."""
     from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
 
-    client = await establish_connection(
-        BleakClientWithServiceCache, device, device.name or device.address,
-        max_attempts=3, timeout=timeout, use_services_cache=False,
-    )
-    try:
-        missing = [uuid for uuid in (PROXY_IN, PROXY_OUT)
-                   if client.services.get_characteristic(uuid) is None]
-        if missing:
-            # Preserve discovery evidence. On Linux cache clearing may remove
-            # the BlueZ device; do not do that automatically or reconnect using
-            # the same potentially invalid BLEDevice.
-            inventory = [(service.uuid,
-                          [char.uuid for char in service.characteristics])
-                         for service in client.services]
-            _LOGGER.warning('Incomplete proxy GATT discovery for %s. '
-                            'Services/characteristics: %s; disconnecting without cache removal',
-                            device.address, inventory)
-            raise IncompleteProxyDiscovery('Mesh proxy characteristics missing after discovery: '
-                                           + ', '.join(missing))
-        yield client
-    finally:
-        await client.disconnect()
+    for attempt in range(2):
+        client = await establish_connection(
+            BleakClientWithServiceCache, device, device.name or device.address,
+            max_attempts=3, timeout=timeout, use_services_cache=(attempt == 0),
+        )
+        try:
+            missing = [uuid for uuid in (PROXY_IN, PROXY_OUT)
+                       if client.services.get_characteristic(uuid) is None]
+            if missing:
+                inventory = [(service.uuid,
+                              [char.uuid for char in service.characteristics])
+                             for service in client.services]
+                _LOGGER.warning('Incomplete proxy GATT discovery for %s. '
+                                'Services/characteristics: %s; disconnecting without cache removal',
+                                device.address, inventory)
+                if attempt:
+                    raise IncompleteProxyDiscovery('Mesh proxy characteristics missing after discovery: '
+                                                   + ', '.join(missing))
+            else:
+                try:
+                    if prepare is not None:
+                        await prepare(client)
+                except BleakError as error:
+                    # ATT INVALID_HANDLE / DATABASE_OUT_OF_SYNC can expose a
+                    # stale cached table only when notifications are enabled.
+                    # This preparation runs before yielding or any mesh writes.
+                    if attempt or getattr(error, 'code', None) not in (0x01, 0x12):
+                        raise
+                    _LOGGER.warning('Stale proxy GATT handle for %s during notification setup; '
+                                    'reconnecting once with fresh discovery', device.address)
+                else:
+                    yield client
+                    return
+        finally:
+            await client.disconnect()
+        await asyncio.sleep(1)
 
 
 class OasisController:
@@ -123,7 +137,8 @@ class OasisController:
         finally:
             store.close()
 
-    async def send(self, device, messages, *, initialize_sender=False, authenticate_only=False):
+    async def send(self, device, messages, *, initialize_sender=False, authenticate_only=False,
+                   device_resolver=None):
         """Send an ordered batch. No automatic resend of partially sent commands.
 
         initialize_sender is only appropriate for a newly reserved sender.
@@ -133,6 +148,12 @@ class OasisController:
         if (not messages and not (initialize_sender or authenticate_only)) or any(not isinstance(m, bytes) or not 1 <= len(m) <= 11 for m in messages):
             raise ValueError('Expected nonempty unsegmented access messages')
         async with self.lock:
+            # Resolve after queued operations finish: an address/backend selected
+            # before waiting may have disappeared or rotated in the meantime.
+            if device_resolver is not None:
+                device = device_resolver()
+                if device is None:
+                    raise BleakError('No reachable mesh proxy when command reached the queue')
             ready = asyncio.Event()
             state = {'iv': None, 'error': None}
             assembler = ProxyReassembler()
@@ -155,8 +176,14 @@ class OasisController:
                 except ValueError:
                     return
 
-            async with self.client_factory(device, timeout=20) as client:
+            async def prepare(client):
+                nonlocal assembler
+                ready.clear()
+                state.update(iv=None, error=None)
+                assembler = ProxyReassembler()
                 await client.start_notify(PROXY_OUT, notify)
+
+            async with self.client_factory(device, timeout=20, prepare=prepare) as client:
                 try:
                     await asyncio.wait_for(ready.wait(), 15)
                     if state['error']:

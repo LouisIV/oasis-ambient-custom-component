@@ -75,13 +75,21 @@ class OasisLight(LightEntity):
         device = network_proxy_for(self.hass, self.controller.net_key)
         if device is None:
             raise HomeAssistantError('Lamp is not reachable through Home Assistant Bluetooth')
+        def resolve_device():
+            nonlocal device
+            device = network_proxy_for(self.hass, self.controller.net_key)
+            return device
+
         try:
-            # The controller serializes each mesh's commands. Incomplete GATT
-            # discovery must also fail here without cache removal or replay:
-            # Linux cache clearing can remove the device from BlueZ entirely.
-            await self.controller.send(device, messages)
+            # Resolve again inside the controller's mesh queue. Transport may
+            # retry incomplete discovery before yielding, but never replays writes
+            # or removes the device from BlueZ.
+            await self.controller.send(
+                device, messages,
+                device_resolver=resolve_device)
         except (BleakError, TimeoutError, OSError, ValueError) as error:
-            _LOGGER.exception('Oasis BLE operation failed for %s', device.address)
+            _LOGGER.exception('Oasis BLE operation failed for %s',
+                              device.address if device is not None else 'unreachable mesh proxy')
             raise HomeAssistantError('Oasis BLE command failed; state not confirmed') from error
 
     async def async_turn_on(self, **kwargs):
@@ -89,6 +97,8 @@ class OasisLight(LightEntity):
         kelvin = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
         rgb = kwargs.get(ATTR_RGB_COLOR)
         if rgb is not None and kelvin is not None:
+            _LOGGER.warning('Conflicting light request: brightness=%r, RGB=%r, kelvin=%r, current mode=%s',
+                            level, rgb, kelvin, self._attr_color_mode)
             raise HomeAssistantError('Choose either RGB or white temperature, not both')
         if level == 0:
             await self.async_turn_off()

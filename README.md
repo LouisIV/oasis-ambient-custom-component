@@ -165,8 +165,12 @@ entries continue working and can use Configure to add more lamps.
 - Connection establishment uses `bleak-retry-connector` supplied by Home
   Assistant's Bluetooth dependency. If a mesh proxy exposes an incomplete GATT
   table, the integration logs the discovered services and characteristics,
-  disconnects, and reports the command failure. It does not automatically clear
-  the Bluetooth cache or reconnect after that failure: on Linux, cache clearing
+  disconnects, and makes one fresh connection attempt after a one-second
+  pause, before any mesh writes. If the table is still incomplete, the command
+  fails. Notification setup also gets this bounded fresh-discovery retry for
+  stale ATT handles, before any sequence allocation or mesh writes. Normal
+  connections use the connector’s validated service cache.
+  The integration does not clear the Bluetooth cache: on Linux, cache clearing
   can remove the device from BlueZ. Command batches are never automatically
   replayed after a send failure.
 - Proxy discovery also matches the Mesh Network ID, so a missing advertised
