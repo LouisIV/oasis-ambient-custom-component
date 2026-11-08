@@ -6,6 +6,13 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- Resolve the current mesh proxy after acquiring the shared command queue so
+  queued commands do not connect using a stale discovery result.
+- Use validated service caching and retry an incomplete GATT service table once after a normal disconnect,
+  before authentication or mesh writes. Never remove the BlueZ device or replay a command after a write failure.
+  This addresses a reproduced Pi discovery failure; sustained hardware
+  validation remains in progress.
+
 - Recheck Bluetooth availability every 30 seconds from Home Assistant's live
   discovery cache, without connecting or sending commands, so missed callbacks
   do not leave a rediscovered lamp stuck unavailable.

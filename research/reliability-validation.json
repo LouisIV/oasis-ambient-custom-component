@@ -1,0 +1,55 @@
+{
+  "date": "2026-11-08",
+  "status": "in_progress",
+  "environment": {
+    "home_assistant": "2026.11.0",
+    "home_assistant_os": "18.4",
+    "hardware": "Raspberry Pi 4, built-in bcm43438-bt adapter",
+    "python": "3.14.10",
+    "bleak": "3.0.2",
+    "bleak_retry_connector": "4.7.1",
+    "habluetooth": "7.1.2"
+  },
+  "observations": [
+    {
+      "revision": "d2d8fea",
+      "result": "failed",
+      "evidence": "A normal white-light command failed with an empty GATT service table. Subsequent BlueZ diagnostics contained the mesh proxy service and both required characteristics. A later connection succeeded without lamp reboot or device removal."
+    },
+    {
+      "revision": "local empty-table retry patch",
+      "result": "failed",
+      "started_utc": "2026-11-08T18:30:56Z",
+      "ended_utc": "2026-11-08T18:34:15Z",
+      "successful_commands": 2,
+      "failed_command_index": 2,
+      "evidence": "Third command returned HTTP 500. Integration logged a nonempty but incomplete service table lacking the mesh proxy characteristics. Test stopped and restored Adaptive Lighting manual_control=false."
+    },
+    {
+      "revision": "local validated-cache and incomplete-table retry patch",
+      "result": "running",
+      "unit_tests_passed": 94,
+      "controller_sha256": "d9bed7e0df5a5d240bb0963d5a6d4751d37ba5c87973a56a8dcbb93f90e44688",
+      "light_sha256": "94c7a7d8e2946606d4f0d240d8592dc97a857dc132dcc1686e656d01ee87f741",
+      "evidence": "Installed files match tested local checksums. Home Assistant restarted successfully. First command succeeded; two-hour stability run is active.",
+      "started_utc": "2026-11-08T18:44:26Z",
+      "checkpoint": {
+        "at_utc": "2026-11-08T18:56:38Z",
+        "successful_commands": 8,
+        "elapsed_seconds": 731.9,
+        "result": "running; live process confirmed; lamp available"
+      }
+    }
+  ],
+  "limitations": [
+    "Home Assistant light state is optimistic; service success does not prove physical illumination.",
+    "Bluetooth logged an ENOMEM management-socket error during a transient host stall. Later available host memory was approximately 1.5 GB; whole-host RAM exhaustion is not established.",
+    "No factory reset, mesh key change, sequence rollback, or BlueZ device removal was performed."
+  ],
+  "unit_test_matrix": {
+    "platform": "macOS arm64; Home Assistant API doubles",
+    "python_3.12.15": 94,
+    "python_3.13.11": 94,
+    "python_3.14.2": 94
+  }
+}

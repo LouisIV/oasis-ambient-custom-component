@@ -92,6 +92,17 @@ class LightAdapterTests(unittest.IsolatedAsyncioTestCase):
     def messages(self):
         return self.controller.send.call_args.args[1]
 
+    async def test_send_resolves_current_proxy_in_controller_queue(self):
+        initial = types.SimpleNamespace(address='old-proxy')
+        current = types.SimpleNamespace(address='new-proxy')
+        async def queued_send(device, messages, *, device_resolver):
+            self.assertIs(device, initial)
+            self.assertIs(device_resolver(), current)
+        self.controller.send.side_effect = queued_send
+        with patch.object(LIGHT, 'network_proxy_for', side_effect=[initial, current]):
+            await self.entity.async_turn_off()
+        self.assertFalse(self.entity._attr_is_on)
+
     async def test_green_switches_mode_before_rgb(self):
         await self.entity.async_turn_on(rgb_color=(0, 255, 0))
         self.assertEqual([m.hex() for m in self.messages()], ['cce50201', 'c6e50200ff00', 'c3e50201'])

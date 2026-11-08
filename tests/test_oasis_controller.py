@@ -49,6 +49,39 @@ class FakeClient:
 
 
 class ControllerTest(unittest.IsolatedAsyncioTestCase):
+    async def test_queued_command_resolves_proxy_after_lock_acquisition(self):
+        with tempfile.TemporaryDirectory() as directory:
+            lock = asyncio.Lock()
+            factory = Mock(side_effect=FakeClient)
+            controller = OasisController(MESH, 'test', 0x7ffe,
+                                         Path(directory) / 'seq.db', lock=lock,
+                                         client_factory=factory)
+            current = SimpleNamespace(address='old')
+            resolver = Mock(side_effect=lambda: current)
+            await lock.acquire()
+            task = asyncio.create_task(controller.send(
+                current, [], initialize_sender=True, device_resolver=resolver))
+            await asyncio.sleep(0)
+            resolver.assert_not_called()
+            current = SimpleNamespace(address='new')
+            lock.release()
+            await task
+            resolver.assert_called_once()
+            self.assertIs(factory.call_args.args[0], current)
+
+    async def test_proxy_lost_while_queued_does_not_connect_or_allocate(self):
+        from bleak.exc import BleakError
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'seq.db'
+            factory = Mock()
+            controller = OasisController(MESH, 'test', 0x7ffe, path,
+                                         client_factory=factory)
+            with self.assertRaisesRegex(BleakError, 'No reachable mesh proxy'):
+                await controller.send(object(), [power(True)],
+                                      initialize_sender=True, device_resolver=lambda: None)
+            factory.assert_not_called()
+            self.assertFalse(path.exists())
+
     async def test_clear_proxy_cache_disconnects_and_checks_backend_result(self):
         client = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(return_value=True))
         backend = SimpleNamespace(establish_connection=AsyncMock(return_value=client),
@@ -73,7 +106,7 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
                     self.assertIs(connected, client)
                     raise ValueError('send failed')
         establish.assert_awaited_once_with(object, device, 'test', max_attempts=3, timeout=20,
-                                          use_services_cache=False)
+                                          use_services_cache=True)
         client.disconnect.assert_awaited_once()
 
     async def test_connector_disconnects_after_success(self):
@@ -89,6 +122,7 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
         from bleak.exc import BleakError
         stale = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(),
                                 services=MagicMock(get_characteristic=Mock(return_value=None)))
+        stale.services.__iter__.side_effect = lambda: iter([SimpleNamespace(uuid='other-service', characteristics=[])])
         establish = AsyncMock(return_value=stale)
         backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
         with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
@@ -96,8 +130,8 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
                 async with connected_client(SimpleNamespace(name='test', address='test')):
                     self.fail('Must not send through a non-proxy connection')
         stale.clear_cache.assert_not_awaited()
-        stale.disconnect.assert_awaited_once()
-        self.assertEqual(establish.await_count, 1)
+        self.assertEqual(establish.await_count, 2)
+        self.assertEqual(stale.disconnect.await_count, 2)
 
     async def test_missing_services_recovery_is_bounded(self):
         from bleak.exc import BleakError
@@ -109,9 +143,59 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(BleakError, 'missing after discovery'):
                 async with connected_client(SimpleNamespace(name='test', address='test')):
                     self.fail('Must not send through a non-proxy connection')
-        self.assertEqual(establish.await_count, 1)
-        self.assertEqual(client.disconnect.await_count, 1)
+        self.assertEqual(establish.await_count, 2)
+        self.assertEqual(client.disconnect.await_count, 2)
         client.clear_cache.assert_not_awaited()
+
+    async def test_empty_discovery_reconnects_once_without_removing_device(self):
+        empty = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(),
+                                services=MagicMock(get_characteristic=Mock(return_value=None)))
+        healthy = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
+        establish = AsyncMock(side_effect=[empty, healthy])
+        backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            async with connected_client(SimpleNamespace(name='test', address='test')) as client:
+                self.assertIs(client, healthy)
+                empty.disconnect.assert_awaited_once()
+        self.assertEqual(establish.await_count, 2)
+        empty.clear_cache.assert_not_awaited()
+        self.assertTrue(establish.await_args_list[0].kwargs['use_services_cache'])
+        self.assertFalse(establish.await_args_list[1].kwargs['use_services_cache'])
+        healthy.disconnect.assert_awaited_once()
+
+    async def test_partial_discovery_reconnects_with_fresh_services(self):
+        partial = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(),
+                                  services=MagicMock(get_characteristic=Mock(return_value=None)))
+        partial.services.__iter__.return_value = iter([
+            SimpleNamespace(uuid='00001800-0000-1000-8000-00805f9b34fb', characteristics=[])])
+        healthy = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
+        establish = AsyncMock(side_effect=[partial, healthy])
+        backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            async with connected_client(SimpleNamespace(name='test', address='test')) as client:
+                self.assertIs(client, healthy)
+                partial.disconnect.assert_awaited_once()
+        self.assertEqual(establish.await_count, 2)
+        self.assertFalse(establish.await_args_list[1].kwargs['use_services_cache'])
+        partial.clear_cache.assert_not_awaited()
+        healthy.disconnect.assert_awaited_once()
+
+    async def test_failure_after_recovery_never_replays_payload(self):
+        from bleak.exc import BleakError
+        empty = SimpleNamespace(disconnect=AsyncMock(),
+                                services=MagicMock(get_characteristic=Mock(return_value=None)))
+        healthy = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
+        establish = AsyncMock(side_effect=[empty, healthy])
+        backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
+        sends = 0
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            with self.assertRaisesRegex(BleakError, 'write failed'):
+                async with connected_client(SimpleNamespace(name='test', address='test')):
+                    sends += 1
+                    raise BleakError('write failed')
+        self.assertEqual(sends, 1)
+        self.assertEqual(establish.await_count, 2)
+        healthy.disconnect.assert_awaited_once()
 
     async def test_two_destinations_use_shared_monotonic_counter(self):
         with tempfile.TemporaryDirectory() as directory:
