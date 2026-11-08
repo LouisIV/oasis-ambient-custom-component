@@ -34,10 +34,16 @@
       "evidence": "Installed files match tested local checksums. Home Assistant restarted successfully. First command succeeded; two-hour stability run is active.",
       "started_utc": "2026-11-08T18:44:26Z",
       "checkpoint": {
-        "at_utc": "2026-11-08T18:56:38Z",
-        "successful_commands": 8,
-        "elapsed_seconds": 731.9,
-        "result": "running; live process confirmed; lamp available"
+        "at_utc": "2026-11-08T19:22:08Z",
+        "successful_commands": 15,
+        "elapsed_seconds": 2262.5,
+        "result": "running; live process confirmed; idle reconnection passed; Adaptive Lighting restored and operating"
+      },
+      "idle_reconnect": {
+        "idle_seconds": 900,
+        "passed_at_utc": "2026-11-08T19:21:38Z",
+        "command_duration_seconds": 5.99,
+        "adaptive_manual_control_restored": true
       }
     }
   ],
@@ -51,5 +57,19 @@
     "python_3.12.15": 94,
     "python_3.13.11": 94,
     "python_3.14.2": 94
+  },
+  "ci": {
+    "commit": "419d521",
+    "platform": "GitHub Actions ubuntu-latest",
+    "python_versions": [
+      "3.12",
+      "3.13"
+    ],
+    "command": "python tests/run_protocol_tests.py",
+    "result": "passed",
+    "runs": [
+      "https://github.com/LouisIV/oasis-ambient-custom-component/actions/runs/42512814070",
+      "https://github.com/LouisIV/oasis-ambient-custom-component/actions/runs/42512818222"
+    ]
   }
 }
