@@ -269,5 +269,10 @@
     "interpretation": "Host resource/event-loop pressure is plausible; whole-host memory exhaustion and the precise cause are not proven. Do not describe this run as free of Bluetooth log errors.",
     "upstream_context": "https://github.com/home-assistant/core/issues/153475",
     "subsequent_result": "No further Bluetooth log errors through the final check at approximately 20:45 UTC. Lamp operation continued and the sustained test completed successfully."
+  },
+  "physical_confirmation": {
+    "source": "user",
+    "result": "Lamp is visibly on and behaving normally",
+    "timing": "Confirmed after the completed two-hour run"
   }
 }
