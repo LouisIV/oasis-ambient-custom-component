@@ -285,7 +285,7 @@
     "subsequent_state": "Lamp unavailable; absent from Pi live scanner and BlueZ object list although historical advertisement remains",
     "conclusion": "The earlier two-hour run passed but did not establish lasting reliability. PR returned to draft pending further repair.",
     "followup_patch": {
-      "status": "installed; configuration check and Home Assistant restart passed; integration loaded; lamp remains unavailable awaiting physical power cycle",
+      "status": "installed; user power cycle restored discovery; standard Home Assistant brightness controls pass; lasting reliability remains unproven",
       "unit_tests_passed": 99,
       "python_versions": [
         "3.12.15",
@@ -294,7 +294,19 @@
       ],
       "behavior": "Retry notification setup once with fresh discovery for ATT invalid-handle or database-out-of-sync errors, before sequence allocation and mesh writes. Other failures and writes are not replayed. Log conflicting RGB/white request values for diagnosis.",
       "protocol/oasis_controller.py_sha256": "d6e943184b7c2c97f5ef89e49f6ad53a088d4af9576638cee51c91d5c9637e4c",
-      "light.py_sha256": "bfa5bb5650fb149912a272c8146fcb71ec56e78e614e893bce60f3d3a40b4b3b"
+      "light.py_sha256": "bfa5bb5650fb149912a272c8146fcb71ec56e78e614e893bce60f3d3a40b4b3b",
+      "post_power_cycle_validation": {
+        "checked_at_utc": "2026-11-08T21:33:33Z",
+        "user_action": "Physical lamp restart",
+        "standard_light_popup_brightness_percent": [
+          50,
+          51,
+          100
+        ],
+        "result": "Commands succeeded; lamp on at brightness 255 and 2700 K; Adaptive Lighting manual control cleared after testing",
+        "errors": "No new Bluetooth or mixed-color errors; one 0.631-second state update warning",
+        "limitations": "The new stale-handle retry has not been observed recovering a live failure. Original mixed-color request path remains unresolved. Power cycling restored discovery but does not establish why advertising stopped."
+      }
     }
   }
 }
