@@ -1,6 +1,6 @@
 {
   "date": "2026-11-08",
-  "status": "completed",
+  "status": "reopened_after_recurrence",
   "environment": {
     "home_assistant": "2026.11.0",
     "home_assistant_os": "18.4",
@@ -274,5 +274,27 @@
     "source": "user",
     "result": "Lamp is visibly on and behaving normally",
     "timing": "Confirmed after the completed two-hour run"
+  },
+  "recurrence": {
+    "at_utc": "2026-11-08T20:58:02Z",
+    "user_action": "Changing brightness",
+    "errors": [
+      "Mixed RGB and white temperature command rejected",
+      "GATT INVALID_HANDLE during start_notify, before mesh writes"
+    ],
+    "subsequent_state": "Lamp unavailable; absent from Pi live scanner and BlueZ object list although historical advertisement remains",
+    "conclusion": "The earlier two-hour run passed but did not establish lasting reliability. PR returned to draft pending further repair.",
+    "followup_patch": {
+      "status": "installed; configuration check and Home Assistant restart passed; integration loaded; lamp remains unavailable awaiting physical power cycle",
+      "unit_tests_passed": 99,
+      "python_versions": [
+        "3.12.15",
+        "3.13.11",
+        "3.14.2"
+      ],
+      "behavior": "Retry notification setup once with fresh discovery for ATT invalid-handle or database-out-of-sync errors, before sequence allocation and mesh writes. Other failures and writes are not replayed. Log conflicting RGB/white request values for diagnosis.",
+      "protocol/oasis_controller.py_sha256": "d6e943184b7c2c97f5ef89e49f6ad53a088d4af9576638cee51c91d5c9637e4c",
+      "light.py_sha256": "bfa5bb5650fb149912a272c8146fcb71ec56e78e614e893bce60f3d3a40b4b3b"
+    }
   }
 }

@@ -22,10 +22,13 @@ class FakeClient:
     sent = []
     destinations = []
 
-    def __init__(self, device, timeout):
+    def __init__(self, device, timeout, *, prepare=None):
+        self.prepare = prepare
         self.assembler = ProxyReassembler()
 
     async def __aenter__(self):
+        if self.prepare is not None:
+            await self.prepare(self)
         return self
 
     async def __aexit__(self, *args):
@@ -196,6 +199,100 @@ class ControllerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sends, 1)
         self.assertEqual(establish.await_count, 2)
         healthy.disconnect.assert_awaited_once()
+
+    async def test_stale_notification_handle_retries_fresh_before_yield(self):
+        from bleak.exc import BleakError
+        error = BleakError('Invalid handle')
+        error.code = 0x01
+        stale = SimpleNamespace(disconnect=AsyncMock(), clear_cache=AsyncMock(), services=Mock())
+        healthy = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
+        establish = AsyncMock(side_effect=[stale, healthy])
+        prepare = AsyncMock(side_effect=[error, None])
+        backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            async with connected_client(SimpleNamespace(name='test', address='test'),
+                                        prepare=prepare) as client:
+                self.assertIs(client, healthy)
+                stale.disconnect.assert_awaited_once()
+        self.assertEqual(prepare.await_count, 2)
+        self.assertTrue(establish.await_args_list[0].kwargs['use_services_cache'])
+        self.assertFalse(establish.await_args_list[1].kwargs['use_services_cache'])
+        stale.clear_cache.assert_not_awaited()
+        healthy.disconnect.assert_awaited_once()
+
+    async def test_stale_notification_recovery_is_bounded(self):
+        from bleak.exc import BleakError
+        error = BleakError('Database out of sync')
+        error.code = 0x12
+        client = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
+        establish = AsyncMock(return_value=client)
+        prepare = AsyncMock(side_effect=error)
+        backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            with self.assertRaisesRegex(BleakError, 'Database out of sync'):
+                async with connected_client(SimpleNamespace(name='test', address='test'),
+                                            prepare=prepare):
+                    self.fail('Must not yield an unprepared connection')
+        self.assertEqual(establish.await_count, 2)
+        self.assertEqual(client.disconnect.await_count, 2)
+
+    async def test_other_notification_error_is_not_retried(self):
+        from bleak.exc import BleakError
+        client = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
+        establish = AsyncMock(return_value=client)
+        prepare = AsyncMock(side_effect=BleakError('Authentication failed'))
+        backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            with self.assertRaisesRegex(BleakError, 'Authentication failed'):
+                async with connected_client(SimpleNamespace(name='test', address='test'),
+                                            prepare=prepare):
+                    self.fail('Must not yield an unprepared connection')
+        establish.assert_awaited_once()
+        client.disconnect.assert_awaited_once()
+
+    async def test_invalid_handle_after_yield_never_replays_command(self):
+        from bleak.exc import BleakError
+        error = BleakError('Invalid handle during write')
+        error.code = 0x01
+        client = SimpleNamespace(disconnect=AsyncMock(), services=Mock())
+        establish = AsyncMock(return_value=client)
+        backend = SimpleNamespace(establish_connection=establish, BleakClientWithServiceCache=object)
+        with patch.dict('sys.modules', {'bleak_retry_connector': backend}):
+            with self.assertRaisesRegex(BleakError, 'Invalid handle during write'):
+                async with connected_client(SimpleNamespace(name='test', address='test'),
+                                            prepare=AsyncMock()):
+                    raise error
+        establish.assert_awaited_once()
+        client.disconnect.assert_awaited_once()
+
+    async def test_notification_retry_discards_beacon_from_failed_connection(self):
+        from bleak.exc import BleakError
+        error = BleakError('Invalid handle')
+        error.code = 0x01
+        def beacon_for(iv):
+            data = bytes([0]) + k3(KEY) + iv.to_bytes(4, 'big')
+            return bytes([1]) + data + cmac(beacon_key(KEY), data)[:8]
+        async def stale_notify(char, callback):
+            for chunk in fragment_proxy(1, beacon_for(0)):
+                callback(None, chunk)
+            raise error
+        async def fresh_notify(char, callback):
+            for chunk in fragment_proxy(1, beacon_for(1)):
+                callback(None, chunk)
+        stale = SimpleNamespace(services=Mock(), start_notify=stale_notify,
+                                disconnect=AsyncMock())
+        healthy = SimpleNamespace(services=Mock(), start_notify=fresh_notify,
+                                  stop_notify=AsyncMock(), disconnect=AsyncMock())
+        backend = SimpleNamespace(establish_connection=AsyncMock(side_effect=[stale, healthy]),
+                                  BleakClientWithServiceCache=object)
+        with tempfile.TemporaryDirectory() as directory:
+            controller = OasisController(MESH, 'test', 0x7ffe, Path(directory) / 'seq.db')
+            with patch.dict('sys.modules', {'bleak_retry_connector': backend}), \
+                 patch.object(controller, '_allocate', return_value=0) as allocate:
+                await controller.send(SimpleNamespace(name='test', address='test'), [],
+                                      initialize_sender=True)
+            allocate.assert_called_once_with(1, True)
+            healthy.stop_notify.assert_awaited_once()
 
     async def test_two_destinations_use_shared_monotonic_counter(self):
         with tempfile.TemporaryDirectory() as directory:

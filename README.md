@@ -167,7 +167,9 @@ entries continue working and can use Configure to add more lamps.
   table, the integration logs the discovered services and characteristics,
   disconnects, and makes one fresh connection attempt after a one-second
   pause, before any mesh writes. If the table is still incomplete, the command
-  fails. Normal connections use the connector’s validated service cache.
+  fails. Notification setup also gets this bounded fresh-discovery retry for
+  stale ATT handles, before any sequence allocation or mesh writes. Normal
+  connections use the connector’s validated service cache.
   The integration does not clear the Bluetooth cache: on Linux, cache clearing
   can remove the device from BlueZ. Command batches are never automatically
   replayed after a send failure.

@@ -97,6 +97,8 @@ class OasisLight(LightEntity):
         kelvin = kwargs.get(ATTR_COLOR_TEMP_KELVIN)
         rgb = kwargs.get(ATTR_RGB_COLOR)
         if rgb is not None and kelvin is not None:
+            _LOGGER.warning('Conflicting light request: brightness=%r, RGB=%r, kelvin=%r, current mode=%s',
+                            level, rgb, kelvin, self._attr_color_mode)
             raise HomeAssistantError('Choose either RGB or white temperature, not both')
         if level == 0:
             await self.async_turn_off()

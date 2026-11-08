@@ -46,7 +46,7 @@ async def clear_proxy_cache(device, timeout=20):
 
 
 @asynccontextmanager
-async def connected_client(device, timeout=20):
+async def connected_client(device, timeout=20, *, prepare=None):
     """Retry connection establishment only; never replay an access-message batch."""
     from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
 
@@ -58,23 +58,31 @@ async def connected_client(device, timeout=20):
         try:
             missing = [uuid for uuid in (PROXY_IN, PROXY_OUT)
                        if client.services.get_characteristic(uuid) is None]
-            if not missing:
-                yield client
-                return
-            inventory = [(service.uuid,
-                          [char.uuid for char in service.characteristics])
-                         for service in client.services]
-            _LOGGER.warning('Incomplete proxy GATT discovery for %s. '
-                            'Services/characteristics: %s; disconnecting without cache removal',
-                            device.address, inventory)
-            # The Pi has returned both empty and partial tables while BlueZ
-            # subsequently exposed the full mesh service. Reconnect once with
-            # fresh discovery, without RemoveDevice or replaying any writes.
-            # The first attempt uses the connector's validated service cache
-            # to avoid repeatedly rediscovering an already verified table.
-            if attempt:
-                raise IncompleteProxyDiscovery('Mesh proxy characteristics missing after discovery: '
-                                               + ', '.join(missing))
+            if missing:
+                inventory = [(service.uuid,
+                              [char.uuid for char in service.characteristics])
+                             for service in client.services]
+                _LOGGER.warning('Incomplete proxy GATT discovery for %s. '
+                                'Services/characteristics: %s; disconnecting without cache removal',
+                                device.address, inventory)
+                if attempt:
+                    raise IncompleteProxyDiscovery('Mesh proxy characteristics missing after discovery: '
+                                                   + ', '.join(missing))
+            else:
+                try:
+                    if prepare is not None:
+                        await prepare(client)
+                except BleakError as error:
+                    # ATT INVALID_HANDLE / DATABASE_OUT_OF_SYNC can expose a
+                    # stale cached table only when notifications are enabled.
+                    # This preparation runs before yielding or any mesh writes.
+                    if attempt or getattr(error, 'code', None) not in (0x01, 0x12):
+                        raise
+                    _LOGGER.warning('Stale proxy GATT handle for %s during notification setup; '
+                                    'reconnecting once with fresh discovery', device.address)
+                else:
+                    yield client
+                    return
         finally:
             await client.disconnect()
         await asyncio.sleep(1)
@@ -168,8 +176,14 @@ class OasisController:
                 except ValueError:
                     return
 
-            async with self.client_factory(device, timeout=20) as client:
+            async def prepare(client):
+                nonlocal assembler
+                ready.clear()
+                state.update(iv=None, error=None)
+                assembler = ProxyReassembler()
                 await client.start_notify(PROXY_OUT, notify)
+
+            async with self.client_factory(device, timeout=20, prepare=prepare) as client:
                 try:
                     await asyncio.wait_for(ready.wait(), 15)
                     if state['error']:
