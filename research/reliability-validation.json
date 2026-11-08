@@ -1,6 +1,6 @@
 {
   "date": "2026-11-08",
-  "status": "in_progress",
+  "status": "completed",
   "environment": {
     "home_assistant": "2026.11.0",
     "home_assistant_os": "18.4",
@@ -27,23 +27,205 @@
     },
     {
       "revision": "local validated-cache and incomplete-table retry patch",
-      "result": "running",
+      "result": "passed_with_host_warning",
       "unit_tests_passed": 94,
       "controller_sha256": "d9bed7e0df5a5d240bb0963d5a6d4751d37ba5c87973a56a8dcbb93f90e44688",
       "light_sha256": "94c7a7d8e2946606d4f0d240d8592dc97a857dc132dcc1686e656d01ee87f741",
-      "evidence": "Installed files match tested local checksums. Home Assistant restarted successfully. First command succeeded; two-hour stability run is active.",
+      "evidence": "Installed files still match tested checksums. Two-hour live test completed: 14 repeated commands, reconnect after 15 minutes idle, approximately 83 minutes of Adaptive Lighting, and a final explicit command. No test failures or Oasis operation errors were recorded. All 237 availability observations were on. Adaptive Lighting manual control was restored to false and another automatic update succeeded after completion.",
       "started_utc": "2026-11-08T18:44:26Z",
-      "checkpoint": {
-        "at_utc": "2026-11-08T19:22:08Z",
-        "successful_commands": 15,
-        "elapsed_seconds": 2262.5,
-        "result": "running; live process confirmed; idle reconnection passed; Adaptive Lighting restored and operating"
-      },
       "idle_reconnect": {
         "idle_seconds": 900,
         "passed_at_utc": "2026-11-08T19:21:38Z",
         "command_duration_seconds": 5.99,
         "adaptive_manual_control_restored": true
+      },
+      "code_commit": "419d521",
+      "ended_utc": "2026-11-08T20:44:32Z",
+      "elapsed_seconds": 7206.4,
+      "successful_commands": 16,
+      "runtime_report": {
+        "start": {
+          "at": "2026-11-08T18:44:26Z",
+          "elapsed": 0,
+          "event": "started",
+          "duration": 7200
+        },
+        "end": {
+          "at": "2026-11-08T20:44:32Z",
+          "elapsed": 7206.4,
+          "event": "completed"
+        },
+        "events": {
+          "command_ok": 16,
+          "completed": 1,
+          "idle_reconnect_passed": 1,
+          "idle_started": 1,
+          "manual_control": 4,
+          "observation": 237,
+          "started": 1
+        },
+        "milestones": [
+          {
+            "at": "2026-11-08T18:44:26Z",
+            "elapsed": 0,
+            "event": "started",
+            "duration": 7200
+          },
+          {
+            "at": "2026-11-08T18:44:26Z",
+            "elapsed": 0.4,
+            "event": "manual_control",
+            "enabled": true
+          },
+          {
+            "at": "2026-11-08T19:06:32Z",
+            "elapsed": 1326.3,
+            "event": "idle_started"
+          },
+          {
+            "at": "2026-11-08T19:21:38Z",
+            "elapsed": 2232.4,
+            "event": "idle_reconnect_passed"
+          },
+          {
+            "at": "2026-11-08T19:21:38Z",
+            "elapsed": 2232.4,
+            "event": "manual_control",
+            "enabled": false
+          },
+          {
+            "at": "2026-11-08T20:44:26Z",
+            "elapsed": 7200,
+            "event": "manual_control",
+            "enabled": true
+          },
+          {
+            "at": "2026-11-08T20:44:32Z",
+            "elapsed": 7206.4,
+            "event": "manual_control",
+            "enabled": false
+          },
+          {
+            "at": "2026-11-08T20:44:32Z",
+            "elapsed": 7206.4,
+            "event": "completed"
+          }
+        ],
+        "commands": [
+          {
+            "index": 0,
+            "duration": 4.9,
+            "at": "2026-11-08T18:44:31Z"
+          },
+          {
+            "index": 1,
+            "duration": 3.99,
+            "at": "2026-11-08T18:46:05Z"
+          },
+          {
+            "index": 2,
+            "duration": 3.98,
+            "at": "2026-11-08T18:47:39Z"
+          },
+          {
+            "index": 3,
+            "duration": 2.98,
+            "at": "2026-11-08T18:49:12Z"
+          },
+          {
+            "index": 4,
+            "duration": 3.92,
+            "at": "2026-11-08T18:50:46Z"
+          },
+          {
+            "index": 5,
+            "duration": 4.96,
+            "at": "2026-11-08T18:52:21Z"
+          },
+          {
+            "index": 6,
+            "duration": 5.97,
+            "at": "2026-11-08T18:53:57Z"
+          },
+          {
+            "index": 7,
+            "duration": 10.24,
+            "at": "2026-11-08T18:55:38Z"
+          },
+          {
+            "index": 8,
+            "duration": 3.69,
+            "at": "2026-11-08T18:57:11Z"
+          },
+          {
+            "index": 9,
+            "duration": 3.89,
+            "at": "2026-11-08T18:58:45Z"
+          },
+          {
+            "index": 10,
+            "duration": 3.96,
+            "at": "2026-11-08T19:00:19Z"
+          },
+          {
+            "index": 11,
+            "duration": 3.99,
+            "at": "2026-11-08T19:01:53Z"
+          },
+          {
+            "index": 12,
+            "duration": 4.61,
+            "at": "2026-11-08T19:03:28Z"
+          },
+          {
+            "index": 13,
+            "duration": 3.84,
+            "at": "2026-11-08T19:05:02Z"
+          },
+          {
+            "index": 14,
+            "duration": 5.99,
+            "at": "2026-11-08T19:21:38Z"
+          },
+          {
+            "index": 16,
+            "duration": 6.31,
+            "at": "2026-11-08T20:44:32Z"
+          }
+        ],
+        "phases": [
+          {
+            "phase": "adaptive_lighting",
+            "observations": 165,
+            "first": "2026-11-08T19:21:38Z",
+            "last": "2026-11-08T20:44:21Z",
+            "states": [
+              "on"
+            ],
+            "distinct_kelvin": 56
+          },
+          {
+            "phase": "idle",
+            "observations": 30,
+            "first": "2026-11-08T19:06:32Z",
+            "last": "2026-11-08T19:21:24Z",
+            "states": [
+              "on"
+            ],
+            "distinct_kelvin": 1
+          },
+          {
+            "phase": "manual_commands",
+            "observations": 42,
+            "first": "2026-11-08T18:44:31Z",
+            "last": "2026-11-08T19:06:02Z",
+            "states": [
+              "on"
+            ],
+            "distinct_kelvin": 1
+          }
+        ],
+        "max_observation_gap_seconds": 46.1
       }
     }
   ],
@@ -71,5 +253,21 @@
       "https://github.com/LouisIV/oasis-ambient-custom-component/actions/runs/42512814070",
       "https://github.com/LouisIV/oasis-ambient-custom-component/actions/runs/42512818222"
     ]
+  },
+  "host_runtime_observation": {
+    "at_utc": "2026-11-08T19:35:08Z",
+    "event": "Bluetooth management socket ENOMEM while loading connection parameters",
+    "correlated_events": "DNS timeouts across multiple unrelated integrations and Zigbee watchdog warning within seconds",
+    "lamp_result": "Adaptive Lighting continued changing lamp temperature; no Oasis operation failure logged at the subsequent check",
+    "later_resources": {
+      "available_memory_kib": 737276,
+      "swap_total_kib": 1279808,
+      "swap_free_kib": 1624,
+      "core_memory_bytes": 572219392,
+      "code_server_memory_bytes": 1028214784
+    },
+    "interpretation": "Host resource/event-loop pressure is plausible; whole-host memory exhaustion and the precise cause are not proven. Do not describe this run as free of Bluetooth log errors.",
+    "upstream_context": "https://github.com/home-assistant/core/issues/153475",
+    "subsequent_result": "No further Bluetooth log errors through the final check at approximately 20:45 UTC. Lamp operation continued and the sustained test completed successfully."
   }
 }
